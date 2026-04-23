@@ -7,7 +7,7 @@ import ChatInput from './components/ChatInput';
 import type { Provider } from './types';
 
 function ChatContainer() {
-  const { streamingContent, isStreaming, scrollRef, send, stop } = useChat();
+  const { streamingContent, streamingReasoningContent, isStreaming, loadingPhase, tokenStats, scrollRef, send, stop } = useChat();
   const sendRef = useRef(send);
 
   useEffect(() => {
@@ -16,11 +16,13 @@ function ChatContainer() {
 
   useEffect(() => {
     const handler = (event: Event) => {
-      const { content, provider } = (event as CustomEvent).detail as {
+      const { content, provider, model, conversationId } = (event as CustomEvent).detail as {
         content: string;
         provider: Provider;
+        model?: string;
+        conversationId?: string;
       };
-      sendRef.current(content, provider);
+      sendRef.current(content, provider, model, conversationId);
     };
 
     window.addEventListener('chat:send', handler);
@@ -31,11 +33,13 @@ function ChatContainer() {
     <div className="flex-1 flex flex-col h-full">
       <ChatArea
         streamingContent={streamingContent}
+        streamingReasoningContent={streamingReasoningContent}
         isStreaming={isStreaming}
+        loadingPhase={loadingPhase}
         onStop={stop}
         scrollRef={scrollRef}
       />
-      <ChatInput onSend={send} />
+      <ChatInput onSend={send} tokenStats={tokenStats} />
     </div>
   );
 }
@@ -60,7 +64,7 @@ export default function App() {
   }, [messages, activeConversationId]);
 
   return (
-    <div className="flex h-screen bg-main text-gray-100">
+    <div className="flex h-screen theme-main theme-text-primary">
       <Sidebar />
       <ChatContainer />
     </div>

@@ -1,6 +1,24 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { Conversation, Message, Provider, ThemeMode } from '../types';
 
+export const LMSTUDIO_ENDPOINTS = [
+  '/api/v1/chat',
+  '/v1/responses',
+  '/v1/chat/completions',
+  '/v1/messages',
+] as const;
+
+export const DEFAULT_ENDPOINTS: Record<Provider['api_type'], readonly string[]> = {
+  openai: ['/v1/chat/completions'],
+  lmstudio: LMSTUDIO_ENDPOINTS,
+};
+
+export function getFullChatUrl(provider: Provider): string {
+  const base = provider.api_url.replace(/\/+$/, '');
+  const endpoint = provider.endpoint.replace(/^\/+/, '');
+  return `${base}/${endpoint}`;
+}
+
 interface AppContextType {
   conversations: Conversation[];
   activeConversationId: string | null;
@@ -21,7 +39,8 @@ interface AppContextType {
     conversationId: string,
     role: 'user' | 'assistant',
     content: string,
-    model?: string
+    model?: string,
+    reasoning?: string
   ) => Promise<Message>;
   deleteMessages: (conversationId: string) => Promise<void>;
   addProvider: (provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => Promise<Provider>;
@@ -77,9 +96,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProviders = useCallback(async () => {
     const list = await window.chatApi.providers.list();
-    setProviders(list);
-    if (list.length > 0 && !activeProvider) {
-      setActiveProvider(list[0]);
+    // Backward compatibility: ensure all providers have a models array
+    const normalized = list.map((p) => ({
+      ...p,
+      models: p.models ?? (p.model_info ? [{ key: p.default_model, model_info: p.model_info }] : []),
+    }));
+    setProviders(normalized);
+    if (normalized.length > 0 && !activeProvider) {
+      setActiveProvider(normalized[0]);
     }
   }, [activeProvider]);
 
@@ -113,8 +137,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addMessage = useCallback(
-    async (conversationId: string, role: 'user' | 'assistant', content: string, model?: string) => {
-      const msg = await window.chatApi.messages.add(conversationId, role, content, model);
+    async (conversationId: string, role: 'user' | 'assistant', content: string, model?: string, reasoning?: string) => {
+      const msg = await window.chatApi.messages.add(conversationId, role, content, model, reasoning);
       setMessages((prev) => [...prev, msg as Message]);
       return msg as Message;
     },
@@ -128,7 +152,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const addProvider = useCallback(
     async (provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => {
-      const newProvider = await window.chatApi.providers.create(provider);
+      const newProvider = await window.chatApi.providers.create({
+        ...provider,
+        api_type: provider.api_type ?? 'openai',
+        endpoint: provider.endpoint ?? '/v1/chat/completions',
+        models: provider.models ?? [],
+      });
       await refreshProviders();
       return newProvider;
     },
@@ -137,7 +166,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateProvider = useCallback(
     async (id: string, provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => {
-      await window.chatApi.providers.update(id, provider);
+      await window.chatApi.providers.update(id, {
+        ...provider,
+        api_type: provider.api_type ?? 'openai',
+        endpoint: provider.endpoint ?? '/v1/chat/completions',
+        models: provider.models ?? [],
+      });
       await refreshProviders();
     },
     [refreshProviders]

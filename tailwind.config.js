@@ -2,21 +2,10 @@ import type { Config } from 'tailwindcss';
 
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        // claude.ai-inspired dark theme
-        sidebar: '#121212',
-        'sidebar-hover': '#1e1e1e',
-        'sidebar-active': '#2a2a2a',
-        main: '#1a1a1a',
-        'main-hover': '#252525',
-        input: '#2c2c2c',
-        'input-focus': '#3a3a3a',
-        border: '#2a2a2a',
-        'border-light': '#333333',
-        // Light theme
+        // Light theme (kept for backwards compatibility with any remaining refs)
         'sidebar-light': '#f5f5f5',
         'sidebar-light-hover': '#e8e8e8',
         'main-light': '#ffffff',

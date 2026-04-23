@@ -12,6 +12,7 @@ interface Message {
   conversation_id: string;
   role: string;
   content: string;
+  reasoning?: string;
   created_at: number;
   model?: string;
 }
@@ -21,9 +22,28 @@ interface Provider {
   name: string;
   api_url: string;
   api_key: string;
+  api_type: 'openai' | 'lmstudio';
+  endpoint: string;
   default_model: string;
+  model_info: ModelInfo | null;
+  models: { key: string; display_name?: string; model_info?: ModelInfo }[];
   created_at: number;
   updated_at: number;
+}
+
+interface ModelInfo {
+  key: string;
+  display_name: string;
+  max_context_length?: number;
+  architecture?: string;
+  format?: string;
+  quantization?: { name: string; bits_per_weight: number };
+  loaded?: boolean;
+  capabilities?: {
+    vision?: boolean;
+    trained_for_tool_use?: boolean;
+    reasoning?: { allowed_options: string[]; default: string };
+  };
 }
 
 const chatApi = {
@@ -40,8 +60,8 @@ const chatApi = {
   messages: {
     get: (conversationId: string) =>
       ipcRenderer.invoke('messages:get', conversationId) as Promise<Message[]>,
-    add: (conversationId: string, role: string, content: string, model?: string) =>
-      ipcRenderer.invoke('messages:add', conversationId, role, content, model) as Promise<Message>,
+    add: (conversationId: string, role: string, content: string, model?: string, reasoning?: string) =>
+      ipcRenderer.invoke('messages:add', conversationId, role, content, model, reasoning) as Promise<Message>,
     delete: (conversationId: string) =>
       ipcRenderer.invoke('messages:delete', conversationId),
   },

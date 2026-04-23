@@ -4,6 +4,41 @@
 
 /* ─── Base styles ─────────────────────────────────────────── */
 
+:root {
+  /* Dark theme (default) */
+  --bg-main: #1a1a1a;
+  --bg-sidebar: #121212;
+  --bg-sidebar-hover: #1e1e1e;
+  --bg-sidebar-active: #2a2a2a;
+  --bg-main-hover: #252525;
+  --bg-input: #2c2c2c;
+  --bg-input-focus: #3a3a3a;
+  --bg-border: #2a2a2a;
+  --bg-border-light: #333333;
+  --text-primary: #e0e0e0;
+  --text-secondary: #888;
+  --text-tertiary: #666;
+  --text-heading: #f0f0f0;
+  --text-muted: #6b7280;
+}
+
+.light {
+  --bg-main: #ffffff;
+  --bg-sidebar: #f5f5f5;
+  --bg-sidebar-hover: #e8e8e8;
+  --bg-sidebar-active: #d8d8d8;
+  --bg-main-hover: #f0f0f0;
+  --bg-input: #f0f0f0;
+  --bg-input-focus: #e0e0e0;
+  --bg-border: #e0e0e0;
+  --bg-border-light: #d0d0d0;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666;
+  --text-tertiary: #888;
+  --text-heading: #111827;
+  --text-muted: #6b7280;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -11,6 +46,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
 }
 
 /* ─── Scrollbar styling ───────────────────────────────────── */
@@ -145,13 +182,6 @@ body {
   50% { opacity: 0; }
 }
 
-.typing-cursor::after {
-  content: '▋';
-  animation: blink 1s infinite;
-  color: #888;
-  margin-left: 2px;
-}
-
 /* ─── Model selector dropdown ─────────────────────────────── */
 
 .model-selector {
@@ -221,3 +251,31 @@ body {
 .light .settings-btn:hover {
   background: rgba(0, 0, 0, 0.1);
 }
+
+/* ─── Theme utility classes ───────────────────────────────── */
+
+/* These replace Tailwind color utilities for theme switching */
+.theme-main { background-color: var(--bg-main); }
+.theme-sidebar { background-color: var(--bg-sidebar); }
+.theme-sidebar-hover { background-color: var(--bg-sidebar-hover); }
+.theme-sidebar-active { background-color: var(--bg-sidebar-active); }
+.theme-main-hover { background-color: var(--bg-main-hover); }
+.theme-input { background-color: var(--bg-input); }
+.theme-input-focus { background-color: var(--bg-input-focus); }
+.theme-border { border-color: var(--bg-border); }
+.theme-border-light { border-color: var(--bg-border-light); }
+.theme-text-primary { color: var(--text-primary); }
+.theme-text-secondary { color: var(--text-secondary); }
+.theme-text-tertiary { color: var(--text-tertiary); }
+.theme-text-heading { color: var(--text-heading); }
+.theme-text-muted { color: var(--text-muted); }
+
+/* Hover variants for theme classes */
+:root .hover-theme-text-primary:hover { color: var(--text-primary); }
+:root .hover-theme-text-secondary:hover { color: var(--text-secondary); }
+:root .hover-theme-sidebar-hover:hover { background-color: var(--bg-sidebar-hover); }
+:root .hover-theme-border-light:hover { border-color: var(--bg-border-light); }
+.light .hover-theme-text-primary:hover { color: var(--text-primary); }
+.light .hover-theme-text-secondary:hover { color: var(--text-secondary); }
+.light .hover-theme-sidebar-hover:hover { background-color: var(--bg-sidebar-hover); }
+.light .hover-theme-border-light:hover { border-color: var(--bg-border-light); }

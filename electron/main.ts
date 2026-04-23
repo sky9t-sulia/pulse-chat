@@ -34,6 +34,7 @@ async function initDatabase() {
       conversation_id TEXT NOT NULL,
       role TEXT NOT NULL,
       content TEXT NOT NULL,
+      reasoning TEXT,
       created_at INTEGER NOT NULL,
       model TEXT,
       FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
@@ -44,13 +45,23 @@ async function initDatabase() {
       name TEXT NOT NULL,
       api_url TEXT NOT NULL,
       api_key TEXT NOT NULL,
+      api_type TEXT NOT NULL DEFAULT 'openai',
+      endpoint TEXT NOT NULL DEFAULT '/v1/chat/completions',
       default_model TEXT NOT NULL,
+      models TEXT NOT NULL DEFAULT '[]',
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
   `);
+
+  // Migration: add reasoning column if it doesn't exist yet
+  try {
+    db.run(`ALTER TABLE messages ADD COLUMN reasoning TEXT`);
+  } catch {
+    // Column already exists or migration not needed
+  }
 
   // Save on shutdown
   app.on('before-quit', () => {
@@ -182,23 +193,23 @@ ipcMain.handle('conversations:updateTitle', (_e, id: string, title: string) => {
 
 ipcMain.handle('messages:get', (_e, conversationId: string) => {
   return query<any>(
-    `SELECT id, role, content, created_at, model FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC`,
+    `SELECT id, role, content, reasoning, created_at, model FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC`,
     [conversationId]
   );
 });
 
 ipcMain.handle(
   'messages:add',
-  (_e, conversationId: string, role: string, content: string, model?: string) => {
+  (_e, conversationId: string, role: string, content: string, model?: string, reasoning?: string) => {
     const id = uuidv4();
     const now = Date.now();
     run(
-      'INSERT INTO messages (id, conversation_id, role, content, created_at, model) VALUES ($1, $2, $3, $4, $5, $6)',
-      [id, conversationId, role, content, now, model || null]
+      'INSERT INTO messages (id, conversation_id, role, content, reasoning, created_at, model) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [id, conversationId, role, content, reasoning || null, now, model || null]
     );
     run('UPDATE conversations SET updated_at = $1 WHERE id = $2', [now, conversationId]);
     saveDb();
-    return { id, role, content, created_at: now, model };
+    return { id, role, content, reasoning, created_at: now, model };
   }
 );
 
@@ -210,28 +221,52 @@ ipcMain.handle('messages:delete', (_e, conversationId: string) => {
 // ─── Providers ───────────────────────────────────────────────
 
 ipcMain.handle('providers:list', () => {
-  return query<any>(`SELECT * FROM providers ORDER BY name`);
+  const rows = query<any>(`SELECT * FROM providers ORDER BY name`);
+  return rows.map((row) => ({
+    ...row,
+    models: typeof row.models === 'string' ? JSON.parse(row.models) : row.models,
+  }));
 });
 
 ipcMain.handle(
   'providers:create',
-  (_e, provider: { name: string; api_url: string; api_key: string; default_model: string }) => {
+  (
+    _e,
+    provider: {
+      name: string;
+      api_url: string;
+      api_key: string;
+      api_type: string;
+      endpoint: string;
+      default_model: string;
+      models: any[];
+    }
+  ) => {
     const id = uuidv4();
     const now = Date.now();
     run(
-      'INSERT INTO providers (id, name, api_url, api_key, default_model, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      'INSERT INTO providers (id, name, api_url, api_key, api_type, endpoint, default_model, models, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
       [
         id,
         provider.name,
         provider.api_url,
         provider.api_key,
+        provider.api_type,
+        provider.endpoint,
         provider.default_model,
+        JSON.stringify(provider.models || []),
         now,
         now,
       ]
     );
     saveDb();
-    return { ...provider, id, created_at: now, updated_at: now };
+    return {
+      ...provider,
+      id,
+      models: provider.models || [],
+      created_at: now,
+      updated_at: now,
+    };
   }
 );
 
@@ -240,11 +275,29 @@ ipcMain.handle(
   (
     _e,
     id: string,
-    provider: { name: string; api_url: string; api_key: string; default_model: string }
+    provider: {
+      name: string;
+      api_url: string;
+      api_key: string;
+      api_type: string;
+      endpoint: string;
+      default_model: string;
+      models: any[];
+    }
   ) => {
     run(
-      'UPDATE providers SET name = $1, api_url = $2, api_key = $3, default_model = $4, updated_at = $5 WHERE id = $6',
-      [provider.name, provider.api_url, provider.api_key, provider.default_model, Date.now(), id]
+      'UPDATE providers SET name = $1, api_url = $2, api_key = $3, api_type = $4, endpoint = $5, default_model = $6, models = $7, updated_at = $8 WHERE id = $9',
+      [
+        provider.name,
+        provider.api_url,
+        provider.api_key,
+        provider.api_type,
+        provider.endpoint,
+        provider.default_model,
+        JSON.stringify(provider.models || []),
+        Date.now(),
+        id,
+      ]
     );
     saveDb();
   }
@@ -257,5 +310,9 @@ ipcMain.handle('providers:delete', (_e, id: string) => {
 
 ipcMain.handle('providers:get', (_e, id: string) => {
   const rows = query<any>(`SELECT * FROM providers WHERE id = $1`, [id]);
-  return rows.length > 0 ? rows[0] : undefined;
+  if (rows.length === 0) return undefined;
+  return {
+    ...rows[0],
+    models: typeof rows[0].models === 'string' ? JSON.parse(rows[0].models) : rows[0].models,
+  };
 });

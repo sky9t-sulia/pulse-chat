@@ -5,12 +5,15 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
-import { StopCircle } from 'lucide-react';
+import { StopCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Message } from '../types';
+import type { LoadingPhase } from '../context/useChat';
 
 interface Props {
   streamingContent: string;
+  streamingReasoningContent: string;
   isStreaming: boolean;
+  loadingPhase: LoadingPhase;
   onStop: () => void;
   scrollRef: React.Ref<HTMLDivElement>;
 }
@@ -96,6 +99,37 @@ function MessageContent({ content }: { content: string }) {
   );
 }
 
+function ReasoningBlock({
+  reasoning,
+  isStreaming,
+}: {
+  reasoning: string;
+  isStreaming?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mb-2 rounded-lg border theme-border overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-sm theme-text-secondary hover-theme-text-primary theme-sidebar-hover transition-all"
+      >
+        {expanded ? (
+          <ChevronUp className="w-3.5 h-3.5" />
+        ) : (
+          <ChevronDown className="w-3.5 h-3.5" />
+        )}
+        <span className="font-medium">Reasoning{isStreaming ? ' (streaming…)' : ''}</span>
+      </button>
+      {expanded && (
+        <div className="px-4 pb-3 text-sm theme-text whitespace-pre-wrap border-t theme-border pt-3 max-h-[400px] overflow-y-auto">
+          {reasoning}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MessageBubble({ message }: { message: Message }) {
   const isUser = message.role === 'user';
 
@@ -104,28 +138,54 @@ function MessageBubble({ message }: { message: Message }) {
       <div
         className={`chat-content chat-text max-w-[85%] ${
           isUser
-            ? 'bg-input text-gray-100 px-4 py-2.5 rounded-2xl rounded-br-md'
-            : 'text-gray-100'
+            ? 'theme-input px-4 py-2.5 rounded-2xl rounded-br-md'
+            : ''
         }`}
       >
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
-          <MessageContent content={message.content} />
+          <>
+            {message.reasoning && <ReasoningBlock reasoning={message.reasoning} />}
+            <MessageContent content={message.content} />
+          </>
         )}
       </div>
     </div>
   );
 }
 
-export default function ChatArea({ streamingContent, isStreaming, onStop, scrollRef }: Props) {
+function LoadingIndicator({ phase }: { phase: LoadingPhase }) {
+  const messages: Record<string, string> = {
+    model_load: 'Loading model...',
+    prompt_processing: 'Processing prompt...',
+  };
+
+  const phaseLabel = messages[phase.kind] || '';
+  const progress = phase.kind === 'model_load' || phase.kind === 'prompt_processing'
+    ? Math.round((phase.progress ?? 0) * 100)
+    : undefined;
+
+  return (
+    <div className="flex justify-center items-center gap-2 py-4">
+      <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+      <span className="text-xs theme-text-muted">
+        {phaseLabel}
+        {progress !== undefined && ` ${progress}%`}
+      </span>
+    </div>
+  );
+}
+
+export default function ChatArea({ streamingContent, streamingReasoningContent, isStreaming, loadingPhase, onStop, scrollRef }: Props) {
   const { activeConversationId, messages } = useApp();
+  const showLoading = isStreaming && loadingPhase.kind !== 'idle' && loadingPhase.kind !== 'streaming';
 
   if (!activeConversationId) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-sidebar-active flex items-center justify-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full theme-sidebar-active flex items-center justify-center">
             <svg
               className="w-8 h-8 text-gray-500"
               fill="none"
@@ -140,8 +200,8 @@ export default function ChatArea({ streamingContent, isStreaming, onStop, scroll
               />
             </svg>
           </div>
-          <h2 className="text-xl font-medium text-gray-400 mb-2">Welcome to Chat</h2>
-          <p className="text-sm text-gray-600">
+          <h2 className="text-xl font-medium theme-text-heading mb-2">Welcome to Chat</h2>
+          <p className="text-sm theme-text-muted">
             Select or create a conversation to get started
           </p>
         </div>
@@ -149,17 +209,25 @@ export default function ChatArea({ streamingContent, isStreaming, onStop, scroll
     );
   }
 
-  if (messages.length === 0 && !streamingContent) {
+  if (messages.length === 0 && !streamingContent && !showLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center max-w-md px-6">
-          <h1 className="text-2xl font-medium text-gray-200 mb-3">
+          <h1 className="text-2xl font-medium theme-text-heading mb-3">
             What can I help with?
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm theme-text-muted">
             Start a conversation by typing a message below.
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (messages.length === 0 && showLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <LoadingIndicator phase={loadingPhase} />
       </div>
     );
   }
@@ -172,14 +240,23 @@ export default function ChatArea({ streamingContent, isStreaming, onStop, scroll
             <MessageBubble key={msg.id} message={msg} />
           ))}
 
-          {streamingContent && (
-            <div className="flex justify-start mb-6">
-              <div className="chat-content chat-text text-gray-100 max-w-[85%]">
-                <MessageContent content={streamingContent} />
-                <span className="typing-cursor inline-block w-2 h-4 bg-gray-400 ml-0.5 align-middle" />
+          {streamingReasoningContent && (
+            <div className="flex justify-start mb-0">
+              <div className="chat-content chat-text max-w-[85%]">
+                <ReasoningBlock reasoning={streamingReasoningContent} isStreaming />
               </div>
             </div>
           )}
+
+          {streamingContent && (
+            <div className="flex justify-start mb-4">
+              <div className="chat-content chat-text max-w-[85%]">
+                <MessageContent content={streamingContent} />
+              </div>
+            </div>
+          )}
+
+          {showLoading && <LoadingIndicator phase={loadingPhase} />}
 
           <div ref={scrollRef} />
         </div>
@@ -189,7 +266,7 @@ export default function ChatArea({ streamingContent, isStreaming, onStop, scroll
         <div className="flex justify-center pb-2">
           <button
             onClick={onStop}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 bg-sidebar-hover border border-border rounded-full transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs theme-text-secondary hover-theme-text-primary theme-sidebar-hover border theme-border rounded-full transition-all"
           >
             <StopCircle className="w-3.5 h-3.5" />
             Stop generating
