@@ -1,0 +1,34 @@
+# Dependencies
+node_modules
+/package-lock.json
+/yarn.lock
+/pnpm-lock.yaml
+
+# Build outputs
+dist
+dist-electron
+out
+
+# Electron
+*.log
+*.tgz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+.qwen
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Database (keep in userData, not repo)
+*.db
+*.db-journal
