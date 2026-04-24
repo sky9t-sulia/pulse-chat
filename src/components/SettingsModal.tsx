@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   useApp,
-  LMSTUDIO_ENDPOINTS,
   CHAT_FONT_STACKS,
   CHAT_FONT_SIZE_STEPS,
 } from '../context/AppContext';
+import { useToolRegistry } from '../context/tools';
 import { strategies } from '../context/providers';
-import type { Provider, ModelInfo, ChatFontFamily } from '../types';
-import { X, Plus, Save, Trash2, Eye, EyeOff, Loader2, Pencil, ChevronDown, ChevronUp, Check, RefreshCw, Heart } from 'lucide-react';
+import type { Provider, ModelInfo, ChatFontFamily, Tool } from '../types';
+import { X, Plus, Save, Trash2, Eye, EyeOff, Loader2, Pencil, ChevronDown, ChevronUp, Check, RefreshCw, Heart, Wrench } from 'lucide-react';
 
 const FONT_FAMILY_OPTIONS: { value: ChatFontFamily; label: string }[] = [
   { value: 'system', label: 'System Default' },
@@ -15,18 +15,6 @@ const FONT_FAMILY_OPTIONS: { value: ChatFontFamily; label: string }[] = [
   { value: 'serif', label: 'Noto Serif' },
   { value: 'mono', label: 'JetBrains Mono' },
 ];
-
-const API_TYPE_OPTIONS: { value: 'openai' | 'lmstudio'; label: string }[] = [
-  { value: 'openai', label: 'OpenAI Compatible' },
-  { value: 'lmstudio', label: 'LM Studio' },
-];
-
-const ENDPOINT_LABELS: Record<string, string> = {
-  '/api/v1/chat': 'Native Chat (/api/v1/chat)',
-  '/v1/responses': 'Responses API (/v1/responses)',
-  '/v1/chat/completions': 'Chat Completions (/v1/chat/completions)',
-  '/v1/messages': 'Messages API (/v1/messages)',
-};
 
 function ProviderForm({
   initial,
@@ -37,36 +25,24 @@ function ProviderForm({
   onSave: (provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => void;
   onCancel: () => void;
 }) {
-  const isEditing = !!initial;
-
-  const [name, setName] = useState(initial?.name || 'LM Studio');
+  const [name, setName] = useState(initial?.name || 'OpenAI');
   const [apiUrl, setApiUrl] = useState(
-    initial?.api_url || 'http://localhost:1234'
+    initial?.api_url || 'https://api.openai.com'
   );
   const [apiKey, setApiKey] = useState(initial?.api_key || '');
-  const [apiType, setApiType] = useState<Provider['api_type']>(
-    initial?.api_type ?? 'lmstudio'
-  );
-  const [endpoint, setEndpoint] = useState(
-    initial?.endpoint ?? '/api/v1/chat'
+  const [endpoint] = useState(
+    initial?.endpoint ?? '/v1/chat/completions'
   );
   const [defaultModel, setDefaultModel] = useState(initial?.default_model || '');
   const [showKey, setShowKey] = useState(false);
 
-  // Current strategy based on apiType (stable reference)
-  const strategy = useMemo(
-    () => (apiType === 'lmstudio' ? strategies.lmstudio : strategies.openai),
-    [apiType],
-  );
+  const strategy = strategies.openai;
 
   // Model auto-fetch state
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [modelFetchError, setModelFetchError] = useState<string | null>(null);
-  const [fetchedAtStartup, setFetchedAtStartup] = useState(false);
   const [modelObjectsMap, setModelObjectsMap] = useState<Record<string, unknown>>({});
-
-  // Per-model overrides: { [modelKey]: { max_context?: number } }
   const [modelOverrides, setModelOverrides] = useState<Record<string, { max_context?: number }>>({});
   // Which fetched models are enabled (default all true)
   const [modelEnabled, setModelEnabled] = useState<Record<string, boolean>>({});
@@ -126,43 +102,13 @@ function ProviderForm({
     } finally {
       setIsFetchingModels(false);
     }
-  }, [apiType, defaultModel]);
+  }, [defaultModel]);
 
   // Auto-fetch models when URL or API key changes
   useEffect(() => {
-    // For existing providers, skip auto-fetch — models are restored from initial.models
-    // For new providers, allow auto-fetch when user changes URL/API key
-    if (isEditing) return;
-    if (!fetchedAtStartup) return;
     if (!apiUrl) { setAvailableModels([]); return; }
     fetchModels(apiUrl, apiKey);
-  }, [apiUrl, apiKey, apiType, fetchModels, fetchedAtStartup, isEditing]);
-
-  // Detect when user starts editing an existing provider
-  useEffect(() => {
-    if (!initial) return;
-    setFetchedAtStartup(false);
-    const check = setTimeout(() => {
-      if (apiUrl !== initial.api_url || apiType !== initial.api_type || endpoint !== initial.endpoint) {
-        setFetchedAtStartup(true);
-        setDefaultModel('');
-        setAvailableModels([]);
-        setModelFetchError(null);
-      }
-    }, 100);
-    return () => clearTimeout(check);
-  }, [initial, apiUrl, apiType, endpoint]);
-
-  // Initial fetch when loading an existing provider
-  useEffect(() => {
-    if (initial && apiUrl && !fetchedAtStartup) {
-      const timer = setTimeout(() => {
-        setFetchedAtStartup(true);
-        fetchModels(apiUrl, apiKey);
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [initial, apiUrl, apiKey, fetchModels, fetchedAtStartup]);
+  }, [apiUrl, apiKey, fetchModels]);
 
   // Restore models when editing an existing provider with models
   useEffect(() => {
@@ -190,57 +136,20 @@ function ProviderForm({
     if (initial.default_model && keys.includes(initial.default_model)) {
       setDefaultModel(initial.default_model);
     }
-    setFetchedAtStartup(true);
   }, [initial]);
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setApiUrl(e.target.value);
-    if (isEditing) {
-      setFetchedAtStartup(false);
-      setDefaultModel('');
-      setAvailableModels([]);
-      setModelObjectsMap({});
-      setModelFetchError(null);
-      setModelOverrides({});
-      setModelEnabled({});
-    }
+    setDefaultModel('');
+    setAvailableModels([]);
+    setModelObjectsMap({});
+    setModelFetchError(null);
+    setModelOverrides({});
+    setModelEnabled({});
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
-  };
-
-  const handleApiTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newType = e.target.value as Provider['api_type'];
-    setApiType(newType);
-    // Set default endpoint for the selected API type
-    if (newType === 'lmstudio') {
-      setEndpoint('/api/v1/chat');
-    } else {
-      setEndpoint('/v1/chat/completions');
-    }
-    if (isEditing) {
-      setFetchedAtStartup(false);
-      setDefaultModel('');
-      setAvailableModels([]);
-      setModelObjectsMap({});
-      setModelFetchError(null);
-      setModelOverrides({});
-      setModelEnabled({});
-    }
-  };
-
-  const handleEndpointChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setEndpoint(e.target.value);
-    if (isEditing) {
-      setFetchedAtStartup(false);
-      setDefaultModel('');
-      setAvailableModels([]);
-      setModelObjectsMap({});
-      setModelFetchError(null);
-      setModelOverrides({});
-      setModelEnabled({});
-    }
   };
 
   const handleManualModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -325,7 +234,7 @@ function ProviderForm({
       name,
       api_url: apiUrl,
       api_key: apiKey || initial?.api_key || '',
-      api_type: apiType,
+      api_type: 'openai',
       endpoint,
       default_model: defaultModel,
       model_info: null,
@@ -343,39 +252,11 @@ function ProviderForm({
           type="text"
           value={name}
           onChange={handleNameChange}
-          placeholder="LM Studio"
+          placeholder="OpenAI"
           className="w-full px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-primary focus:outline-none focus:border-gray-500"
           required
         />
       </div>
-
-      <div>
-        <label className="block text-xs text-gray-400 mb-1">API Type</label>
-        <select
-          value={apiType}
-          onChange={handleApiTypeChange}
-          className="w-full px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-primary focus:outline-none focus:border-gray-500 bg-theme-input"
-        >
-          {API_TYPE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-
-      {apiType === 'lmstudio' && (
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Endpoint</label>
-          <select
-            value={endpoint}
-            onChange={handleEndpointChange}
-            className="w-full px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-primary focus:outline-none focus:border-gray-500 bg-theme-input"
-          >
-            {LMSTUDIO_ENDPOINTS.map((ep) => (
-              <option key={ep} value={ep}>{ENDPOINT_LABELS[ep] || ep}</option>
-            ))}
-          </select>
-        </div>
-      )}
 
       <div>
         <label className="block text-xs text-gray-400 mb-1">API URL</label>
@@ -383,7 +264,7 @@ function ProviderForm({
           type="url"
           value={apiUrl}
           onChange={handleUrlChange}
-          placeholder="http://localhost:1234"
+          placeholder="https://api.openai.com"
           className="w-full px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-primary focus:outline-none focus:border-gray-500"
           required
         />
@@ -676,7 +557,7 @@ function ProvidersTab() {
                     {provider.name}
                   </span>
                   <span className="text-[10px] theme-sidebar-active theme-text-secondary px-1.5 py-0.5 rounded">
-                    {provider.api_type === 'lmstudio' ? 'LM Studio' : 'OpenAI'}
+                    OpenAI
                   </span>
                   {isActive && (
                     <span className="text-[10px] bg-[var(--accent)] text-white px-1.5 py-0.5 rounded">
@@ -810,8 +691,208 @@ function ChatTab() {
   );
 }
 
+function ToolsTab() {
+  const { tools, enabledTools, updateTool, addTool, deleteTool } = useToolRegistry();
+  const [showForm, setShowForm] = useState(false);
+  const [editingTool, setEditingTool] = useState<Tool | null>(null);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [parameters, setParameters] = useState('{}');
+  const [paramError, setParamError] = useState<string | null>(null);
+
+  const openEdit = (tool: Tool) => {
+    setEditingTool(tool);
+    setName(tool.name);
+    setDescription(tool.description);
+    setParameters(JSON.stringify(tool.parameters, null, 2));
+    setShowForm(true);
+  };
+
+  const openNew = () => {
+    setEditingTool(null);
+    setName('');
+    setDescription('');
+    setParameters('{}');
+    setParamError(null);
+    setShowForm(true);
+  };
+
+  const cancelForm = () => {
+    setShowForm(false);
+    setEditingTool(null);
+    setParamError(null);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setParamError(null);
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(parameters);
+    } catch {
+      setParamError('Invalid JSON in parameters');
+      return;
+    }
+
+    if (editingTool) {
+      updateTool(editingTool.id, { name, description, parameters: parsed as Record<string, unknown> });
+    } else {
+      addTool({ name, description, parameters: parsed as Record<string, unknown>, enabled: true, is_built_in: false });
+    }
+    cancelForm();
+  };
+
+  const handleToggle = async (tool: Tool) => {
+    await updateTool(tool.id, { enabled: !tool.enabled });
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-medium theme-text-primary">
+          {showForm ? (editingTool ? 'Edit Tool' : 'Add Tool') : 'Tools'}
+        </h3>
+        {!showForm && (
+          <button
+            onClick={openNew}
+            className="text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1"
+          >
+            <Plus className="w-3 h-3" />
+            Add Tool
+          </button>
+        )}
+      </div>
+
+      {showForm ? (
+        <form onSubmit={handleSubmit} className="space-y-3 theme-input border theme-border-light rounded-lg p-4 mb-3">
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="my_tool"
+              className="w-full px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-primary focus:outline-none focus:border-gray-500 font-mono"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What this tool does..."
+              rows={2}
+              className="w-full px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-primary focus:outline-none focus:border-gray-500 resize-none"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">
+              Parameters (JSON Schema)
+            </label>
+            <textarea
+              value={parameters}
+              onChange={(e) => { setParameters(e.target.value); setParamError(null); }}
+              placeholder={`{\n  "type": "object",\n  "properties": {\n    "query": { "type": "string", "description": "Search query" }\n  },\n  "required": ["query"]\n}`}
+              rows={6}
+              className="w-full px-3 py-2 theme-input border theme-border-light rounded-lg text-xs theme-text-primary focus:outline-none focus:border-gray-500 font-mono resize-none"
+              required
+            />
+            {paramError && <p className="text-xs text-red-400 mt-1">{paramError}</p>}
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={cancelForm}
+              className="px-4 py-2 text-sm theme-text-secondary hover-theme-text-primary transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors flex items-center gap-1"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {editingTool ? 'Update' : 'Add'}
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      <div className="space-y-2">
+        {tools.length === 0 ? (
+          <p className="text-xs theme-text-muted text-center py-4">No tools configured.</p>
+        ) : (
+          tools.map((tool) => (
+            <div
+              key={tool.id}
+              className={`flex items-center gap-3 px-3 py-2.5 theme-input border theme-border-light rounded-lg transition-colors ${
+                !tool.enabled ? 'opacity-50' : ''
+              }`}
+            >
+              <Wrench className="w-4 h-4 theme-text-muted flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono theme-text-primary">{tool.name}</span>
+                  {tool.is_built_in && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded theme-input theme-text-muted border theme-border-light">
+                      built-in
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs theme-text-muted truncate mt-0.5">{tool.description}</p>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  onClick={() => handleToggle(tool)}
+                  className={`w-8 h-4 rounded-full transition-colors relative ${
+                    tool.enabled ? 'bg-[var(--accent)]' : 'theme-input border theme-border-light'
+                  }`}
+                  title={tool.enabled ? 'Disable' : 'Enable'}
+                >
+                  <div
+                    className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform ${
+                      tool.enabled ? 'translate-x-4' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+                {!tool.is_built_in && (
+                  <>
+                    <button
+                      onClick={() => openEdit(tool)}
+                      className="p-1 theme-text-secondary hover-theme-text-primary transition-colors"
+                      title="Edit"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => deleteTool(tool.id)}
+                      className="p-1 theme-text-secondary hover:text-red-400 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {enabledTools.length > 0 && (
+        <p className="text-xs theme-text-muted mt-3 text-center">
+          {enabledTools.length} tool{enabledTools.length !== 1 ? 's' : ''} enabled — available to your model during chat.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function SettingsModal({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<'providers' | 'chat'>('providers');
+  const [tab, setTab] = useState<'providers' | 'tools' | 'chat'>('providers');
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -838,6 +919,16 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
             Providers
           </button>
           <button
+            onClick={() => setTab('tools')}
+            className={`px-3 py-2 text-sm transition-colors border-b-2 -mb-px ${
+              tab === 'tools'
+                ? 'theme-text-primary border-gray-400'
+                : 'theme-text-secondary border-transparent hover-theme-text-primary'
+            }`}
+          >
+            Tools
+          </button>
+          <button
             onClick={() => setTab('chat')}
             className={`px-3 py-2 text-sm transition-colors border-b-2 -mb-px ${
               tab === 'chat'
@@ -849,7 +940,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {tab === 'providers' ? <ProvidersTab /> : <ChatTab />}
+        {tab === 'providers' ? <ProvidersTab /> : tab === 'tools' ? <ToolsTab /> : <ChatTab />}
 
         <div className="pt-4 mt-6 border-t theme-border">
           <p className="text-xs theme-text-muted">

@@ -22,7 +22,7 @@ interface Provider {
   name: string;
   api_url: string;
   api_key: string;
-  api_type: 'openai' | 'lmstudio';
+  api_type: 'openai';
   endpoint: string;
   default_model: string;
   model_info: ModelInfo | null;
@@ -44,6 +44,25 @@ interface ModelInfo {
     trained_for_tool_use?: boolean;
     reasoning?: { allowed_options: string[]; default: string };
   };
+}
+
+interface Tool {
+  id: string;
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  enabled: boolean;
+  is_built_in: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+interface ToolResult {
+  tool_call_id: string;
+  name: string;
+  content: string;
+  error?: string;
+  duration_ms: number;
 }
 
 const chatApi = {
@@ -97,6 +116,16 @@ const chatApi = {
     delete: (id: string) => ipcRenderer.invoke('providers:delete', id),
     get: (id: string) =>
       ipcRenderer.invoke('providers:get', id) as Promise<Provider | undefined>,
+  },
+  tools: {
+    list: () => ipcRenderer.invoke('tools:list') as Promise<Tool[]>,
+    create: (tool: Omit<Tool, 'id' | 'created_at' | 'updated_at'>) =>
+      ipcRenderer.invoke('tools:create', tool) as Promise<Tool>,
+    update: (id: string, tool: Partial<Omit<Tool, 'id' | 'created_at' | 'updated_at'>>) =>
+      ipcRenderer.invoke('tools:update', id, tool),
+    delete: (id: string) => ipcRenderer.invoke('tools:delete', id),
+    execute: (toolName: string, toolArgsJson: string) =>
+      ipcRenderer.invoke('tools:execute', toolName, toolArgsJson) as Promise<ToolResult>,
   },
 };
 

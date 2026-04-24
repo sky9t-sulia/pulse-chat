@@ -1,13 +1,11 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useApp, getFullChatUrl } from './AppContext';
+import { useToolRegistry } from './tools';
 import type { Provider } from '../types';
 
-type ApiKind = 'openai' | 'lmstudio-chat' | 'lmstudio-responses' | 'lmstudio-messages';
 export type LoadingPhase =
   | { kind: 'idle' }
   | { kind: 'waiting' }
-  | { kind: 'model_load'; progress: number }
-  | { kind: 'prompt_processing'; progress: number }
   | { kind: 'streaming' };
 
 export interface TokenStats {
@@ -15,14 +13,6 @@ export interface TokenStats {
   total_output_tokens: number;
   reasoning_output_tokens: number;
   tokens_per_second?: number;
-}
-
-function getApiKind(provider: Provider): ApiKind {
-  if (provider.api_type === 'openai') return 'openai';
-  if (provider.endpoint === '/api/v1/chat') return 'lmstudio-chat';
-  if (provider.endpoint === '/v1/responses') return 'lmstudio-responses';
-  if (provider.endpoint === '/v1/messages') return 'lmstudio-messages';
-  return 'openai';
 }
 
 // Hidden base system prompt — prepended to the user-provided system prompt.
@@ -40,96 +30,69 @@ function composeSystemPrompt(userPrompt: string): string {
   return `${BASE_SYSTEM_PROMPT}\n\n---\n\n${trimmed}`;
 }
 
+interface ApiToolCall {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+
+interface ApiMessage {
+  role: string;
+  content: string | null;
+  tool_calls?: ApiToolCall[];
+  tool_call_id?: string;
+  name?: string;
+}
+
 function buildRequestBody(
-  kind: ApiKind,
   model: string,
-  messages: { role: string; content: string }[],
+  messages: ApiMessage[],
   userSystemPrompt: string,
-  previousResponseId?: string
+  previousResponseId?: string,
+  tools?: Record<string, unknown>[],
 ): Record<string, unknown> {
   const systemPrompt = composeSystemPrompt(userSystemPrompt);
-  const withSystem = systemPrompt
+  const withSystem: ApiMessage[] = systemPrompt
     ? [{ role: 'system', content: systemPrompt }, ...messages]
     : messages;
-  const latestUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-  switch (kind) {
-    case 'lmstudio-chat':
-    case 'lmstudio-responses': {
-      // Stateful endpoints — `input` is the new turn only; prior history is
-      // tracked server-side via previous_response_id.
-      const body: Record<string, unknown> = {
-        model,
-        input: latestUserMsg?.content ?? '',
-        stream: true,
-      };
-      if (systemPrompt) body.system_prompt = systemPrompt;
-      if (previousResponseId) body.previous_response_id = previousResponseId;
-      return body;
-    }
-    case 'lmstudio-messages': {
-      // Anthropic Messages API takes system as a top-level field, not a message role
-      const body: Record<string, unknown> = {
-        model,
-        max_tokens: 2048,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        stream: true,
-      };
-      if (systemPrompt) body.system = systemPrompt;
-      return body;
-    }
-    default: {
-      const body: Record<string, unknown> = {
-        model,
-        messages: withSystem.map((m) => ({ role: m.role, content: m.content })),
-        stream: true,
-        stream_options: { include_usage: true },
-      };
-      if (previousResponseId) body.previous_response_id = previousResponseId;
-      return body;
-    }
+  const body: Record<string, unknown> = {
+    model,
+    messages: withSystem.map((m) => {
+      const out: Record<string, unknown> = { role: m.role, content: m.content };
+      if (m.tool_calls) out.tool_calls = m.tool_calls;
+      if (m.tool_call_id) out.tool_call_id = m.tool_call_id;
+      if (m.name) out.name = m.name;
+      return out;
+    }),
+    stream: true,
+    stream_options: { include_usage: true },
+  };
+  if (tools && tools.length > 0) {
+    body.tools = tools;
   }
+  if (previousResponseId) body.previous_response_id = previousResponseId;
+  return body;
 }
 
 async function generateTitle(
   provider: Provider,
   model: string,
   userMessage: string,
-  assistantMessage: string
+  assistantMessage: string,
 ): Promise<string | null> {
   const prompt = `Summarize the following chat in 3-6 words as a short title. Respond with only the title — no quotes, no trailing punctuation.\n\nUser: ${userMessage.slice(0, 500)}\nAssistant: ${assistantMessage.slice(0, 500)}`;
-  const kind = getApiKind(provider);
   const chatUrl = getFullChatUrl(provider);
 
-  let body: Record<string, unknown>;
-  switch (kind) {
-    case 'lmstudio-chat':
-    case 'lmstudio-responses':
-      body = { model, input: prompt, stream: false };
-      break;
-    case 'lmstudio-messages':
-      body = {
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        stream: false,
-      };
-      break;
-    default:
-      body = {
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        stream: false,
-      };
-  }
+  const body = {
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    stream: false,
+  };
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (provider.api_type === 'openai') {
-    headers.Authorization = `Bearer ${provider.api_key}`;
-  } else if (provider.endpoint === '/v1/messages') {
-    headers['x-api-key'] = provider.api_key;
-    headers['anthropic-version'] = '2023-06-01';
-  } else if (provider.api_key) {
-    headers.Authorization = `Bearer ${provider.api_key}`;
-  }
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${provider.api_key}`,
+  };
 
   try {
     const res = await fetch(chatUrl, {
@@ -141,35 +104,12 @@ async function generateTitle(
     const data = await res.json();
 
     const raw =
-      // OpenAI chat completions
       data?.choices?.[0]?.message?.content ??
-      // LM Studio Responses API
-      (Array.isArray(data?.output)
-        ? data.output
-            .filter((o: { type?: string }) => o.type === 'message')
-            .map((o: { content?: unknown }) => {
-              if (typeof o.content === 'string') return o.content;
-              if (Array.isArray(o.content)) {
-                return o.content
-                  .map((c: { text?: string }) => c.text ?? '')
-                  .join('');
-              }
-              return '';
-            })
-            .join('')
-        : null) ??
-      data?.output_text ??
-      // Anthropic Messages API
-      (Array.isArray(data?.content)
-        ? data.content
-            .map((c: { text?: string }) => c.text ?? '')
-            .join('')
-        : null) ??
       null;
 
     if (typeof raw !== 'string') return null;
     const cleaned = raw
-      .replace(/^["'“”‘’\s]+|["'“”‘’\s.,!?]+$/g, '')
+      .replace(/^["'""''\s]+|["'""''\s.,!?]+$/g, '')
       .split('\n')[0]
       .trim();
     if (!cleaned) return null;
@@ -181,6 +121,7 @@ async function generateTitle(
 
 export function useChat() {
   const { messages, activeConversationId, addMessage, deleteMessage, chatSettings, updateConversationTitle } = useApp();
+  const { toolDefinitions } = useToolRegistry();
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingReasoningContent, setStreamingReasoningContent] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -221,6 +162,12 @@ export function useChat() {
     }
   }, [messages, streamingContent, streamingReasoningContent]);
 
+  // Execute a tool via IPC
+  const executeTool = useCallback(async (toolName: string, toolArgsJson: string) => {
+    const result = await window.chatApi.tools.execute(toolName, toolArgsJson);
+    return result;
+  }, []);
+
   const send = useCallback(
     async (content: string, provider: Provider, model?: string, conversationIdOverride?: string) => {
       // Use override if provided, otherwise fall back to state
@@ -234,16 +181,8 @@ export function useChat() {
 
       const current = messagesRef.current;
       const full = current.some((m) => m.id === userMsg.id) ? current : current.concat(userMsg);
-      const chatMessages = full.map((m) => ({ role: m.role, content: m.content }));
-      const kind = getApiKind(provider);
+      const chatMessages: ApiMessage[] = full.map((m) => ({ role: m.role, content: m.content }));
       const chatUrl = getFullChatUrl(provider);
-      const body = buildRequestBody(
-        kind,
-        usedModel,
-        chatMessages,
-        chatSettings.system_prompt,
-        responseIdRef.current[convId]
-      );
 
       setIsStreaming(true);
       setLoadingPhase({ kind: 'waiting' });
@@ -256,267 +195,347 @@ export function useChat() {
       let firstContentAt: number | null = null;
       const requestStartedAt = Date.now();
 
-      try {
-        const fetchInit: RequestInit = {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(body),
-        };
+      // Stream helper — reuses the fetch+read logic
+      type StreamResult = {
+        content: string;
+        reasoning: string;
+        stats: TokenStats | null;
+        toolCalls: ApiToolCall[];
+      };
 
-        // Auth headers vary by endpoint
-        if (provider.api_type === 'openai') {
-          fetchInit.headers = {
-            ...fetchInit.headers,
-            Authorization: `Bearer ${provider.api_key}`,
-          };
-        } else if (provider.endpoint === '/v1/messages') {
-          fetchInit.headers = {
-            ...fetchInit.headers,
-            'x-api-key': provider.api_key,
-            'anthropic-version': '2023-06-01',
-          };
-        } else {
-          if (provider.api_key) {
-            fetchInit.headers = {
-              ...fetchInit.headers,
-              Authorization: `Bearer ${provider.api_key}`,
-            };
+      const emptyResult: StreamResult = {
+        content: '',
+        reasoning: '',
+        stats: null,
+        toolCalls: [],
+      };
+
+      const streamResponse = async (
+        streamMessages: ApiMessage[],
+        streamConvId: string,
+      ): Promise<StreamResult> => {
+        const streamBody = buildRequestBody(
+          usedModel,
+          streamMessages,
+          chatSettings.system_prompt,
+          responseIdRef.current[streamConvId],
+          (toolDefinitions as Record<string, unknown>[]) || undefined,
+        );
+
+        let streamAccumulatedContent = '';
+        let streamAccumulatedReasoningContent = '';
+        let streamFinalStats: TokenStats | null = null;
+        let streamFirstContentAt: number | null = null;
+        const toolCallsByIndex: Record<number, { id: string; name: string; args: string }> = {};
+
+        // Models like DeepSeek R1 / QwQ / Qwen3-thinking emit <think>...</think> in content.
+        // Route the tagged segment into reasoning; deliver the rest as content.
+        let thinkBuffer = '';
+        let insideThink = false;
+        const routeContent = (chunk: string) => {
+          thinkBuffer += chunk;
+          while (thinkBuffer.length > 0) {
+            if (insideThink) {
+              const end = thinkBuffer.indexOf('</think>');
+              if (end === -1) {
+                // Hold back the last 7 chars in case `</think` is split across chunks
+                const safe = thinkBuffer.length > 7 ? thinkBuffer.slice(0, -7) : '';
+                if (safe) {
+                  streamAccumulatedReasoningContent += safe;
+                  thinkBuffer = thinkBuffer.slice(safe.length);
+                }
+                break;
+              }
+              streamAccumulatedReasoningContent += thinkBuffer.slice(0, end);
+              thinkBuffer = thinkBuffer.slice(end + '</think>'.length);
+              insideThink = false;
+            } else {
+              const start = thinkBuffer.indexOf('<think>');
+              if (start === -1) {
+                const safe = thinkBuffer.length > 6 ? thinkBuffer.slice(0, -6) : '';
+                if (safe) {
+                  streamAccumulatedContent += safe;
+                  thinkBuffer = thinkBuffer.slice(safe.length);
+                }
+                break;
+              }
+              streamAccumulatedContent += thinkBuffer.slice(0, start);
+              thinkBuffer = thinkBuffer.slice(start + '<think>'.length);
+              insideThink = true;
+            }
           }
-        }
-
-        const response = await fetch(chatUrl, fetchInit);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          setStreamingContent(`[Error ${response.status}: ${errorText}]`);
-          setIsStreaming(false);
-          setLoadingPhase({ kind: 'idle' });
-          return;
-        }
-
-        const reader = response.body?.getReader();
-        if (!reader) {
-          setStreamingContent('[Error: No stream available]');
-          setIsStreaming(false);
-          setLoadingPhase({ kind: 'idle' });
-          return;
-        }
-
-        cancelRef.current = () => {
-          cancelRef.current = null;
-          reader.cancel();
+          setStreamingContent(streamAccumulatedContent);
+          setStreamingReasoningContent(streamAccumulatedReasoningContent);
         };
-
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let currentEventType = '';
 
         try {
-          while (true) {
-            const { done: streamDone, value } = await reader.read();
-            if (streamDone) break;
+          const fetchInit: RequestInit = {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${provider.api_key}`,
+            },
+            body: JSON.stringify(streamBody),
+          };
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+          const response = await fetch(chatUrl, fetchInit);
 
-            for (const line of lines) {
-              if (line.startsWith('event:')) {
-                currentEventType = line.slice(6).trim();
-                continue;
-              }
+          if (!response.ok) {
+            const errorText = await response.text();
+            setStreamingContent(`[Error ${response.status}: ${errorText}]`);
+            setIsStreaming(false);
+            setLoadingPhase({ kind: 'idle' });
+            return emptyResult;
+          }
 
-              if (line.startsWith('data:')) {
-                const data = line.slice(5).trim();
-                if (!data || data === '[DONE]') {
-                  currentEventType = '';
+          const reader = response.body?.getReader();
+          if (!reader) {
+            setStreamingContent('[Error: No stream available]');
+            setIsStreaming(false);
+            setLoadingPhase({ kind: 'idle' });
+            return emptyResult;
+          }
+
+          cancelRef.current = () => {
+            cancelRef.current = null;
+            reader.cancel();
+          };
+
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let currentEventType = '';
+
+          try {
+            while (true) {
+              const { done: streamDone, value } = await reader.read();
+              if (streamDone) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+
+              for (const line of lines) {
+                if (line.startsWith('event:')) {
+                  currentEventType = line.slice(6).trim();
                   continue;
                 }
 
-                try {
-                  const json = JSON.parse(data);
+                if (line.startsWith('data:')) {
+                  const data = line.slice(5).trim();
+                  if (!data || data === '[DONE]') {
+                    currentEventType = '';
+                    continue;
+                  }
 
-                  // Use json.type as fallback if currentEventType is empty
-                  // (LM Studio sometimes omits event: lines)
-                  const eventType = currentEventType || json.type;
+                  try {
+                    const json = JSON.parse(data);
 
-                  switch (eventType) {
-                    case 'chat.start':
-                      // Server has accepted the request and is about to start work.
-                      setLoadingPhase({ kind: 'waiting' });
-                      break;
-                    case 'model_load.start':
-                      setLoadingPhase({ kind: 'model_load', progress: 0 });
-                      break;
-                    case 'response.created':
-                      // Extract response_id for next request
-                      if (json.id) {
-                        responseIdRef.current[convId] = json.id;
-                      }
-                      break;
-                    case 'model_load.progress':
-                      setLoadingPhase({ kind: 'model_load', progress: json.progress ?? 0 });
-                      break;
-                    case 'model_load.end':
-                      setLoadingPhase({ kind: 'waiting' });
-                      break;
-                    case 'prompt_processing.start':
-                      setLoadingPhase({ kind: 'prompt_processing', progress: 0 });
-                      break;
-                    case 'prompt_processing.progress':
-                      setLoadingPhase({ kind: 'prompt_processing', progress: json.progress ?? 0 });
-                      break;
-                    case 'prompt_processing.end':
-                      setLoadingPhase({ kind: 'waiting' });
-                      break;
-                    case 'reasoning.start':
-                    case 'reasoning_start':
-                      setLoadingPhase({ kind: 'streaming' });
-                      break;
-                    case 'message.start':
-                    case 'message_start':
-                      setLoadingPhase({ kind: 'streaming' });
-                      break;
-                    case 'message.delta':
-                    case 'message_delta':
-                      setLoadingPhase({ kind: 'streaming' });
-                      if (json.content) {
-                        accumulatedContent += json.content;
-                        if (firstContentAt === null) firstContentAt = Date.now();
-                        setStreamingContent(accumulatedContent);
-                      }
-                      // LM Studio may include reasoning alongside content in message delta
-                      // or nested in json.delta.reasoning (Anthropic-style)
-                      const reasoningFromMessage = json.reasoning ?? json.delta?.reasoning ?? '';
-                      if (reasoningFromMessage) {
-                        accumulatedReasoningContent += reasoningFromMessage;
-                        setStreamingReasoningContent(accumulatedReasoningContent);
-                      }
-                      break;
-                    case 'reasoning.delta':
-                    case 'reasoning_delta':
-                      setLoadingPhase({ kind: 'streaming' });
-                      // LM Studio may send reasoning in json.content or json.reasoning
-                      const reasoningText = json.content ?? json.reasoning ?? '';
-                      if (reasoningText) {
-                        accumulatedReasoningContent += reasoningText;
-                        setStreamingReasoningContent(accumulatedReasoningContent);
-                      }
-                      break;
-                    case 'response.output_text.delta':
-                      setLoadingPhase({ kind: 'streaming' });
-                      if (json.text) {
-                        accumulatedContent += json.text;
-                        if (firstContentAt === null) firstContentAt = Date.now();
-                        setStreamingContent(accumulatedContent);
-                      }
-                      break;
-                    case 'content_block_delta':
-                      setLoadingPhase({ kind: 'streaming' });
-                      if (json.delta?.text) {
-                        accumulatedContent += json.delta.text;
-                        if (firstContentAt === null) firstContentAt = Date.now();
-                        setStreamingContent(accumulatedContent);
-                      }
-                      break;
-                    case 'response.completed':
-                      if (json.stats) {
-                        finalStats = json.stats as TokenStats;
-                        setTokenStats(finalStats);
-                      }
-                      break;
-                    case 'chat.end':
-                      // chat.end contains the FULL reasoning and message content
-                      // This is the most reliable source for the complete content
-                      if (json.result?.output) {
-                        for (const item of json.result.output) {
-                          if (item.type === 'reasoning' && item.content) {
-                            accumulatedReasoningContent = item.content;
-                            setStreamingReasoningContent(accumulatedReasoningContent);
-                          } else if (item.type === 'message' && item.content) {
-                            accumulatedContent = item.content;
-                            if (firstContentAt === null) firstContentAt = Date.now();
-                        setStreamingContent(accumulatedContent);
+                    const eventType = currentEventType || json.type;
+
+                    switch (eventType) {
+                      case 'response.created':
+                        if (json.id) {
+                          responseIdRef.current[streamConvId] = json.id;
+                        }
+                        break;
+                      case 'response.output_text.delta':
+                        if (json.text) {
+                          streamAccumulatedContent += json.text;
+                          if (streamFirstContentAt === null) streamFirstContentAt = Date.now();
+                          setStreamingContent(streamAccumulatedContent);
+                        }
+                        break;
+                      case 'response.completed':
+                        if (json.stats) {
+                          streamFinalStats = json.stats as TokenStats;
+                          setTokenStats(streamFinalStats);
+                        }
+                        break;
+                      case 'response.finish':
+                        if (json.result?.output) {
+                          for (const item of json.result.output) {
+                            if (item.type === 'message' && item.content) {
+                              streamAccumulatedContent = item.content;
+                              if (streamFirstContentAt === null) streamFirstContentAt = Date.now();
+                              setStreamingContent(streamAccumulatedContent);
+                            }
                           }
                         }
-                      }
-                      // Also extract token stats from chat.end
-                      if (json.result?.stats) {
-                        finalStats = json.result.stats as TokenStats;
-                        setTokenStats(finalStats);
-                      } else if (json.stats) {
-                        // Some LM Studio versions send stats at top level
-                        finalStats = json.stats as TokenStats;
-                        setTokenStats(finalStats);
-                      }
-                      // Also store response_id from chat.end result
-                      if (json.result?.response_id) {
-                        responseIdRef.current[convId] = json.result.response_id;
-                      } else if (json.result?.id) {
-                        responseIdRef.current[convId] = json.result.id;
-                      }
-                      break;
-                    default:
-                      // OpenAI format (no event: prefix) or unrecognized event
-                      if (json.choices?.[0]?.delta?.content) {
-                        setLoadingPhase({ kind: 'streaming' });
-                        accumulatedContent += json.choices[0].delta.content;
-                        if (firstContentAt === null) firstContentAt = Date.now();
-                        setStreamingContent(accumulatedContent);
-                      }
-                      // Reasoning for OpenAI-compatible streams:
-                      //   - OpenRouter / LM Studio: choices[0].delta.reasoning
-                      //   - DeepSeek R1-style: choices[0].delta.reasoning_content
-                      //   - LM Studio top-level: json.reasoning
-                      {
+                        if (json.result?.stats) {
+                          streamFinalStats = json.result.stats as TokenStats;
+                          setTokenStats(streamFinalStats);
+                        } else if (json.stats) {
+                          streamFinalStats = json.stats as TokenStats;
+                          setTokenStats(streamFinalStats);
+                        }
+                        if (json.result?.response_id) {
+                          responseIdRef.current[streamConvId] = json.result.response_id;
+                        } else if (json.result?.id) {
+                          responseIdRef.current[streamConvId] = json.result.id;
+                        }
+                        break;
+                      default:
+                        // OpenAI chat completions streaming format
+                        if (json.choices?.[0]?.delta?.content) {
+                          setLoadingPhase({ kind: 'streaming' });
+                          if (streamFirstContentAt === null) streamFirstContentAt = Date.now();
+                          routeContent(json.choices[0].delta.content);
+                        }
+                        // Tool calls for OpenAI-compatible streams
                         const delta = json.choices?.[0]?.delta;
-                        const reasoningChunk =
-                          delta?.reasoning ?? delta?.reasoning_content ?? json.reasoning ?? '';
+                        if (delta?.tool_calls) {
+                          for (const tc of delta.tool_calls) {
+                            const idx = typeof tc.index === 'number' ? tc.index : 0;
+                            const entry = toolCallsByIndex[idx] || { id: '', name: '', args: '' };
+                            if (tc.id) entry.id = tc.id;
+                            if (tc.function?.name) entry.name += tc.function.name;
+                            if (tc.function?.arguments) entry.args += tc.function.arguments;
+                            toolCallsByIndex[idx] = entry;
+                          }
+                          setLoadingPhase({ kind: 'streaming' });
+                        }
+                        // Reasoning — providers use different fields:
+                        //   OpenAI o-series / OpenRouter: delta.reasoning (string)
+                        //   DeepSeek / many local runners: delta.reasoning_content (string)
+                        //   Some: delta.reasoning.content (object with .content)
+                        //   Some: delta.thinking / delta.thought
+                        let reasoningChunk = '';
+                        if (typeof delta?.reasoning === 'string') {
+                          reasoningChunk = delta.reasoning;
+                        } else if (typeof delta?.reasoning?.content === 'string') {
+                          reasoningChunk = delta.reasoning.content;
+                        } else if (typeof delta?.reasoning_content === 'string') {
+                          reasoningChunk = delta.reasoning_content;
+                        } else if (typeof delta?.thinking === 'string') {
+                          reasoningChunk = delta.thinking;
+                        } else if (typeof delta?.thought === 'string') {
+                          reasoningChunk = delta.thought;
+                        }
                         if (reasoningChunk) {
                           setLoadingPhase({ kind: 'streaming' });
-                          accumulatedReasoningContent += reasoningChunk;
-                          setStreamingReasoningContent(accumulatedReasoningContent);
+                          streamAccumulatedReasoningContent += reasoningChunk;
+                          setStreamingReasoningContent(streamAccumulatedReasoningContent);
                         }
-                      }
-                      // OpenAI sends usage in the final chunk when stream_options.include_usage is set
-                      if (json.usage) {
-                        finalStats = {
-                          input_tokens: json.usage.prompt_tokens ?? 0,
-                          total_output_tokens: json.usage.completion_tokens ?? 0,
-                          reasoning_output_tokens:
-                            json.usage.completion_tokens_details?.reasoning_tokens ?? 0,
-                        };
-                        setTokenStats(finalStats);
-                      }
-                      break;
+                        // OpenAI sends usage in the final chunk when stream_options.include_usage is set
+                        if (json.usage) {
+                          streamFinalStats = {
+                            input_tokens: json.usage.prompt_tokens ?? 0,
+                            total_output_tokens: json.usage.completion_tokens ?? 0,
+                            reasoning_output_tokens:
+                              json.usage.completion_tokens_details?.reasoning_tokens ?? 0,
+                          };
+                          setTokenStats(streamFinalStats);
+                        }
+                        break;
+                    }
+                  } catch {
+                    // skip malformed JSON
                   }
-                } catch {
-                  // skip malformed JSON
-                }
 
-                currentEventType = '';
+                  currentEventType = '';
+                }
               }
             }
+          } finally {
+            cancelRef.current = null;
           }
-        } finally {
-          cancelRef.current = null;
+
+          // Flush any residual text left in the <think> buffer
+          if (thinkBuffer.length > 0) {
+            if (insideThink) {
+              streamAccumulatedReasoningContent += thinkBuffer;
+              setStreamingReasoningContent(streamAccumulatedReasoningContent);
+            } else {
+              streamAccumulatedContent += thinkBuffer;
+              setStreamingContent(streamAccumulatedContent);
+            }
+            thinkBuffer = '';
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setStreamingContent(`[Error: ${msg}]`);
+          setIsStreaming(false);
+          setLoadingPhase({ kind: 'idle' });
+          return emptyResult;
         }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setStreamingContent(`[Error: ${msg}]`);
-        setIsStreaming(false);
-        setLoadingPhase({ kind: 'idle' });
+
+        const toolCalls: ApiToolCall[] = Object.keys(toolCallsByIndex)
+          .map((k) => Number(k))
+          .sort((a, b) => a - b)
+          .map((idx) => {
+            const e = toolCallsByIndex[idx];
+            return {
+              id: e.id || `call_${idx}`,
+              type: 'function' as const,
+              function: { name: e.name, arguments: e.args || '{}' },
+            };
+          })
+          .filter((tc) => tc.function.name);
+
+        return {
+          content: streamAccumulatedContent,
+          reasoning: streamAccumulatedReasoningContent,
+          stats: streamFinalStats,
+          toolCalls,
+        };
+      };
+
+      // Main streaming loop — handles tool calls iteratively
+      let loopMessages: ApiMessage[] = [...chatMessages];
+      let loopResult: Awaited<ReturnType<typeof streamResponse>> = emptyResult;
+      let maxLoops = 10; // Safety limit
+
+      while (maxLoops > 0) {
+        loopResult = await streamResponse(loopMessages, convId);
+        accumulatedContent = loopResult.content;
+        accumulatedReasoningContent = loopResult.reasoning;
+        finalStats = loopResult.stats;
+        if (firstContentAt === null && (accumulatedContent || accumulatedReasoningContent)) {
+          firstContentAt = Date.now();
+        }
+
+        if (loopResult.toolCalls.length === 0) break;
+
+        // Append assistant turn (content + tool_calls) to the conversation we send next
+        loopMessages = [
+          ...loopMessages,
+          {
+            role: 'assistant',
+            content: accumulatedContent || null,
+            tool_calls: loopResult.toolCalls,
+          },
+        ];
+
+        // Execute each tool call and append its result
+        for (const tc of loopResult.toolCalls) {
+          let toolResultContent = '';
+          let toolError: string | undefined;
+          try {
+            const toolRes = await executeTool(tc.function.name, tc.function.arguments);
+            toolResultContent = toolRes.content;
+            toolError = toolRes.error;
+          } catch (err: unknown) {
+            toolError = err instanceof Error ? err.message : String(err);
+          }
+          loopMessages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            name: tc.function.name,
+            content: toolError ? `[Error: ${toolError}]\n${toolResultContent}` : toolResultContent,
+          });
+        }
+
+        setStreamingContent('');
+        setStreamingReasoningContent('');
+        setLoadingPhase({ kind: 'waiting' });
+        maxLoops--;
       }
 
+      // Final: save the message and finish
       if (accumulatedContent) {
         const isFirstAssistant = !messagesRef.current.some((m) => m.role === 'assistant');
         const firstUserMsg = messagesRef.current.find((m) => m.role === 'user')?.content ?? '';
 
-        // Prefer provider-reported tokens_per_second (LM Studio) — convert back to
-        // a synthetic duration so the displayed tok/s matches exactly. Otherwise
-        // fall back to our own timing (OpenAI-compatible providers don't report tps).
         let durationMs: number;
         if (
           finalStats?.tokens_per_second &&
@@ -544,9 +563,6 @@ export function useChat() {
           durationMs
         );
 
-        // Clear streaming state now so the saved message replaces the streaming
-        // bubble immediately — otherwise a long-running title generation below
-        // would leave both visible side-by-side.
         setStreamingContent('');
         setStreamingReasoningContent('');
         setIsStreaming(false);
@@ -566,7 +582,7 @@ export function useChat() {
       setIsStreaming(false);
       setLoadingPhase({ kind: 'idle' });
     },
-    [activeConversationId, isStreaming, addMessage, chatSettings.system_prompt, updateConversationTitle]
+    [activeConversationId, isStreaming, addMessage, chatSettings.system_prompt, updateConversationTitle, toolDefinitions, executeTool]
   );
 
   const stop = useCallback(() => {

@@ -34,7 +34,7 @@ interface Provider {
   name: string;
   api_url: string;
   api_key: string;
-  api_type: 'openai' | 'lmstudio';
+  api_type: 'openai';
   endpoint: string;
   default_model: string;
   model_info: ModelInfo | null;
@@ -89,6 +89,32 @@ interface ChatAPI {
     delete: (id: string) => Promise<void>;
     get: (id: string) => Promise<Provider | undefined>;
   };
+  tools: {
+    list: () => Promise<Tool[]>;
+    create: (tool: Omit<Tool, 'id' | 'created_at' | 'updated_at'>) => Promise<Tool>;
+    update: (id: string, tool: Partial<Omit<Tool, 'id' | 'created_at' | 'updated_at'>>) => Promise<void>;
+    delete: (id: string) => Promise<void>;
+    execute: (toolName: string, toolArgsJson: string) => Promise<ToolResult>;
+  };
+}
+
+interface Tool {
+  id: string;
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  enabled: boolean;
+  is_built_in: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+interface ToolResult {
+  tool_call_id: string;
+  name: string;
+  content: string;
+  error?: string;
+  duration_ms: number;
 }
 
 declare global {

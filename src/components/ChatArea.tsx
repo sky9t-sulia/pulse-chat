@@ -347,14 +347,9 @@ function LoadingIndicator({
   const [expanded, setExpanded] = useState(false);
   const labels: Record<string, string> = {
     waiting: 'Thinking',
-    model_load: 'Loading model',
-    prompt_processing: 'Processing prompt',
   };
 
   const phaseLabel = labels[phase.kind] || 'Thinking';
-  const progress = phase.kind === 'model_load' || phase.kind === 'prompt_processing'
-    ? Math.round((phase.progress ?? 0) * 100)
-    : undefined;
 
   const hasReasoning = !!reasoning;
   const Wrapper: React.ElementType = hasReasoning ? 'button' : 'div';
@@ -375,7 +370,6 @@ function LoadingIndicator({
         </div>
         <span className="text-xs theme-text-muted">
           {phaseLabel}
-          {progress !== undefined && ` · ${progress}%`}
         </span>
         {hasReasoning && (
           expanded

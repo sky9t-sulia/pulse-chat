@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { AppProvider } from './context/AppContext';
+import { ToolRegistryProvider } from './context/tools';
 
 // Bundled fonts (offline-safe for packaged Electron app)
 import '@fontsource/inter/300.css';
@@ -22,7 +23,9 @@ import './index.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppProvider>
-      <App />
+      <ToolRegistryProvider>
+        <App />
+      </ToolRegistryProvider>
     </AppProvider>
   </React.StrictMode>
 );

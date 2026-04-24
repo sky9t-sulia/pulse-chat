@@ -31,7 +31,7 @@ export interface Provider {
   name: string;
   api_url: string;
   api_key: string;
-  api_type: 'openai' | 'lmstudio';
+  api_type: 'openai';
   endpoint: string;
   default_model: string;
   model_info: ModelInfo | null;
@@ -71,4 +71,29 @@ export interface ChatSettings {
   system_prompt: string;
   font_family: ChatFontFamily;
   font_size: number;
+}
+
+export interface Tool {
+  id: string;
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>; // JSON Schema
+  enabled: boolean;
+  is_built_in: boolean; // cannot be deleted, only toggled
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: string; // JSON string of arguments
+}
+
+export interface ToolResult {
+  tool_call_id: string;
+  name: string;
+  content: string;
+  error?: string;
+  duration_ms: number;
 }

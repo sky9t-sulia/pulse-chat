@@ -53,6 +53,17 @@ async function initDatabase() {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS tools (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL,
+      parameters TEXT NOT NULL DEFAULT '{}',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      is_built_in INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
   `);
 
@@ -122,6 +133,48 @@ async function initDatabase() {
   });
 }
 
+async function registerBuiltInTools() {
+  if (!db || !SQL) return;
+
+  // Web Search tool
+  const webSearchDef = JSON.stringify({
+    type: 'function',
+    function: {
+      name: 'web_search',
+      description: 'Search the web for information. Use this when the user asks a question that requires up-to-date or factual information.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The search query to look up',
+          },
+        },
+        required: ['query'],
+      },
+    },
+  });
+
+  const now = Date.now();
+  const rows = query<any>(`SELECT id FROM tools WHERE name = 'web_search'`);
+  if (rows.length === 0) {
+    run(
+      'INSERT INTO tools (id, name, description, parameters, enabled, is_built_in, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        uuidv4(),
+        'web_search',
+        'Search the web for information using a search engine. Returns relevant results with titles, URLs, and snippets.',
+        webSearchDef,
+        1,
+        1,
+        now,
+        now,
+      ]
+    );
+    saveDb();
+  }
+}
+
 function saveDb() {
   if (!db || !SQL) return;
   const data = db.export();
@@ -163,6 +216,7 @@ function createWindow() {
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   await initDatabase();
+  await registerBuiltInTools();
   createWindow();
 
   app.on('activate', () => {
@@ -375,31 +429,30 @@ ipcMain.handle(
     _e,
     id: string,
     provider: {
-      name: string;
-      api_url: string;
-      api_key: string;
-      api_type: string;
-      endpoint: string;
-      default_model: string;
-      models: any[];
+      name?: string;
+      api_url?: string;
+      api_key?: string;
+      api_type?: string;
+      endpoint?: string;
+      default_model?: string;
+      models?: any[];
       model_info?: Record<string, unknown> | null;
     }
   ) => {
-    run(
-      'UPDATE providers SET name = ?, api_url = ?, api_key = ?, api_type = ?, endpoint = ?, default_model = ?, models = ?, model_info = ?, updated_at = ? WHERE id = ?',
-      [
-        provider.name,
-        provider.api_url,
-        provider.api_key,
-        provider.api_type,
-        provider.endpoint,
-        provider.default_model,
-        JSON.stringify(provider.models || []),
-        provider.model_info ? JSON.stringify(provider.model_info) : null,
-        Date.now(),
-        id,
-      ]
-    );
+    const sets: string[] = [];
+    const params: any[] = [];
+    if (provider.name !== undefined) { sets.push('name = ?'); params.push(provider.name); }
+    if (provider.api_url !== undefined) { sets.push('api_url = ?'); params.push(provider.api_url); }
+    if (provider.api_key !== undefined) { sets.push('api_key = ?'); params.push(provider.api_key); }
+    if (provider.api_type !== undefined) { sets.push('api_type = ?'); params.push(provider.api_type); }
+    if (provider.endpoint !== undefined) { sets.push('endpoint = ?'); params.push(provider.endpoint); }
+    if (provider.default_model !== undefined) { sets.push('default_model = ?'); params.push(provider.default_model); }
+    if (provider.models !== undefined) { sets.push('models = ?'); params.push(JSON.stringify(provider.models)); }
+    if (provider.model_info !== undefined) { sets.push('model_info = ?'); params.push(provider.model_info ? JSON.stringify(provider.model_info) : null); }
+    sets.push('updated_at = ?');
+    params.push(Date.now());
+    params.push(id);
+    run(`UPDATE providers SET ${sets.join(', ')} WHERE id = ?`, params);
     saveDb();
   }
 );
@@ -417,4 +470,160 @@ ipcMain.handle('providers:get', (_e, id: string) => {
     models: typeof rows[0].models === 'string' ? JSON.parse(rows[0].models) : rows[0].models,
     model_info: rows[0].model_info ? JSON.parse(rows[0].model_info) : null,
   };
+});
+
+// ─── Tools ───────────────────────────────────────────────────
+
+ipcMain.handle('tools:list', () => {
+  const rows = query<any>(`SELECT * FROM tools ORDER BY name`);
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    parameters: typeof row.parameters === 'string' ? JSON.parse(row.parameters) : row.parameters,
+    enabled: row.enabled === 1,
+    is_built_in: row.is_built_in === 1,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }));
+});
+
+ipcMain.handle(
+  'tools:create',
+  (_e, tool: { name: string; description: string; parameters: Record<string, unknown>; enabled?: boolean }) => {
+    const id = uuidv4();
+    const now = Date.now();
+    run(
+      'INSERT INTO tools (id, name, description, parameters, enabled, is_built_in, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        id,
+        tool.name,
+        tool.description,
+        JSON.stringify(tool.parameters),
+        tool.enabled !== false ? 1 : 0,
+        0,
+        now,
+        now,
+      ]
+    );
+    saveDb();
+    return {
+      id,
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+      enabled: tool.enabled !== false,
+      is_built_in: false,
+      created_at: now,
+      updated_at: now,
+    };
+  }
+);
+
+ipcMain.handle(
+  'tools:update',
+  (_e, id: string, tool: { name?: string; description?: string; parameters?: Record<string, unknown>; enabled?: boolean }) => {
+    const sets: string[] = [];
+    const params: any[] = [];
+    if (tool.name !== undefined) { sets.push('name = ?'); params.push(tool.name); }
+    if (tool.description !== undefined) { sets.push('description = ?'); params.push(tool.description); }
+    if (tool.parameters !== undefined) { sets.push('parameters = ?'); params.push(JSON.stringify(tool.parameters)); }
+    if (tool.enabled !== undefined) { sets.push('enabled = ?'); params.push(tool.enabled ? 1 : 0); }
+    sets.push('updated_at = ?');
+    params.push(Date.now());
+    params.push(id);
+    run(`UPDATE tools SET ${sets.join(', ')} WHERE id = ?`, params);
+    saveDb();
+  }
+);
+
+ipcMain.handle('tools:delete', (_e, id: string) => {
+  const rows = query<any>(`SELECT is_built_in FROM tools WHERE id = ?`, [id]);
+  if (rows.length > 0 && rows[0].is_built_in === 1) {
+    throw new Error('Cannot delete built-in tools. Use enabled toggle instead.');
+  }
+  run('DELETE FROM tools WHERE id = ?', [id]);
+  saveDb();
+});
+
+ipcMain.handle('tools:execute', async (_e, toolName: string, toolArgsJson: string) => {
+  const startTime = Date.now();
+
+  // Built-in tools registry
+  const builtInHandlers: Record<string, (args: any) => Promise<{ content: string; error?: string }>> = {
+    web_search: async (args: { query: string }) => {
+      const encoded = encodeURIComponent(args.query);
+      const url = `https://html.duckduckgo.com/html/?q=${encoded}`;
+
+      try {
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        });
+        const html = await res.text();
+
+        const results: Array<{ title: string; url: string; snippet: string }> = [];
+        const snippets = html.match(/<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>[\s\S]*?<div[^>]*class="result__snippet"[^>]*>([^<]*)/g);
+
+        if (snippets) {
+          for (const block of snippets) {
+            const urlMatch = block.match(/href="([^"]*)"/);
+            const titleMatch = block.match(/class="result__a"[^>]*>([^<]*)/);
+            const snippetMatch = block.match(/class="result__snippet"[^>]*>([^<]*)/);
+            if (urlMatch && titleMatch && snippetMatch) {
+              results.push({
+                title: titleMatch[1].trim(),
+                url: urlMatch[1],
+                snippet: snippetMatch[1].trim(),
+              });
+            }
+          }
+        }
+
+        // Fallback parser
+        if (results.length === 0) {
+          const links = html.match(/<a[^>]*href="(https?:\/\/[^"]+)"[^>]*>([^<]*)<\/a>/g);
+          const seen = new Set<string>();
+          if (links) {
+            for (const link of links) {
+              const hrefMatch = link.match(/href="(https?:\/\/[^"]+)"/);
+              const textMatch = link.match(/>([^<]*)<\/a>/);
+              if (hrefMatch && textMatch && !hrefMatch[1].includes('duckduckgo') && !seen.has(hrefMatch[1])) {
+                seen.add(hrefMatch[1]);
+                results.push({ title: textMatch[1].trim(), url: hrefMatch[1], snippet: '' });
+                if (results.length >= 5) break;
+              }
+            }
+          }
+        }
+
+        const content = results.length > 0
+          ? results.map((r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet}`).join('\n\n')
+          : 'No results found.';
+        return { content };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: '', error: `Search failed: ${msg}` };
+      }
+    },
+  };
+
+  const handler = builtInHandlers[toolName];
+  if (!handler) {
+    return { content: '', error: `Unknown tool: ${toolName}`, duration_ms: Date.now() - startTime };
+  }
+
+  try {
+    const args = JSON.parse(toolArgsJson);
+    const result = await handler(args);
+    return {
+      content: result.content,
+      error: result.error,
+      duration_ms: Date.now() - startTime,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { content: '', error: `Tool execution error: ${msg}`, duration_ms: Date.now() - startTime };
+  }
 });

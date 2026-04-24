@@ -41,16 +41,8 @@ function loadChatSettings(): ChatSettings {
   }
 }
 
-export const LMSTUDIO_ENDPOINTS = [
-  '/api/v1/chat',
-  '/v1/responses',
-  '/v1/chat/completions',
-  '/v1/messages',
-] as const;
-
 export const DEFAULT_ENDPOINTS: Record<Provider['api_type'], readonly string[]> = {
   openai: ['/v1/chat/completions'],
-  lmstudio: LMSTUDIO_ENDPOINTS,
 };
 
 export function getFullChatUrl(provider: Provider): string {
@@ -179,7 +171,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       models: (p.models ?? (p.model_info ? [{ key: p.default_model, model_info: p.model_info }] : [])).map((m: any) => {
         const info = m.model_info ?? {};
         // If model_info is missing max_context_length, try to get it from the model object itself
-        // (LM Studio API puts max_context_length directly on model objects)
         const maxCtx = info.max_context_length ?? (m.max_context_length as number);
         return {
           ...m,
