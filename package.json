@@ -1,10 +1,10 @@
 {
-  "name": "chat-app",
+  "name": "pulse",
   "version": "1.0.0",
   "private": true,
-  "description": "A local first LLM desktop app",
+  "description": "A local-first LLM desktop chat app",
   "author": "suleiman <suleiman@example.com>",
-  "homepage": "https://github.com/suleiman/chat-app",
+  "homepage": "https://github.com/suleiman/pulse",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -51,8 +51,8 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.chat.app",
-    "productName": "Chat App",
+    "appId": "com.pulse.app",
+    "productName": "Pulse",
     "directories": {
       "output": "release"
     },

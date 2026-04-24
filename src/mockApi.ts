@@ -2,7 +2,7 @@
 // Only runs if window.chatApi is not already defined (i.e., not in Electron)
 
 if (!window.chatApi) {
-const STORAGE_KEY = 'chat-app-mock-data';
+const STORAGE_KEY = 'pulse-mock-data';
 
 function generateId() {
   return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 11);

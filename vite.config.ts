@@ -3,10 +3,20 @@ import react from '@vitejs/plugin-react';
 import packageJson from './package.json';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Replace __PACKAGE_NAME__ in index.html at build time
+    {
+      name: 'inject-html-env',
+      transformIndexHtml(html) {
+        return html.replace('__PACKAGE_NAME__', packageJson.name);
+      },
+    },
+  ],
   base: './',
   define: {
     'import.meta.env.PACKAGE_VERSION': JSON.stringify(packageJson.version),
+    'import.meta.env.PACKAGE_NAME': JSON.stringify(packageJson.name),
   },
   build: {
     outDir: 'dist',

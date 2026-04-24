@@ -853,7 +853,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
 
         <div className="pt-4 mt-6 border-t theme-border">
           <p className="text-xs theme-text-muted">
-            Chat App v{import.meta.env.PACKAGE_VERSION || '1.0.0'} — Local first LLM desktop client
+            {import.meta.env.PACKAGE_NAME} v{import.meta.env.PACKAGE_VERSION || '1.0.0'} — Local-first LLM desktop client
           </p>
         </div>
       </div>
