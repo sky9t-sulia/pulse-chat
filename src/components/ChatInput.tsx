@@ -1,36 +1,21 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { Send, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, ChevronDown, ChevronUp, Brain, Square } from 'lucide-react';
 import type { Provider } from '../types';
 import type { TokenStats } from '../context/useChat';
 
 interface Props {
   onSend: (content: string, provider: Provider, model: string, conversationId?: string) => void;
   tokenStats: TokenStats | null;
+  isStreaming: boolean;
+  onStop: () => void;
 }
 
-function getStoredModel(providerId: string): string | null {
-  try {
-    return localStorage.getItem(`chat-model-${providerId}`);
-  } catch {
-    return null;
-  }
-}
-
-function setStoredModel(providerId: string, model: string) {
-  try {
-    localStorage.setItem(`chat-model-${providerId}`, model);
-  } catch {
-    // ignore
-  }
-}
-
-export default function ChatInput({ onSend, tokenStats }: Props) {
-  const { activeConversationId, activeProvider, providers, updateConversationTitle, setActiveProvider, createConversation, setActiveConversationId } = useApp();
+export default function ChatInput({ onSend, tokenStats, isStreaming, onStop }: Props) {
+  const { activeConversationId, activeProvider, activeModel, setActiveModel, providers, updateConversationTitle, setActiveProvider, createConversation, setActiveConversationId } = useApp();
   const [input, setInput] = useState('');
   const [showProviderDropdown, setShowProviderDropdown] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
-  const [selectedModelKey, setSelectedModelKey] = useState<string>('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -40,26 +25,13 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
   );
   const displayModelName = useCallback(() => {
     if (!activeProvider) return '';
-    // Prefer stored selection, then default_model, then first in list
-    if (selectedModelKey) return selectedModelKey;
-    const stored = getStoredModel(activeProvider.id);
-    if (stored) return stored;
-    return activeProvider.default_model || availableModels[0]?.key || '';
-  }, [activeProvider, selectedModelKey, availableModels]);
-
-  // Sync selected model when provider changes
-  useEffect(() => {
-    if (!activeProvider) {
-      setSelectedModelKey('');
-      return;
+    const exists = (key: string) => availableModels.some((m) => m.key === key);
+    if (activeModel && exists(activeModel)) return activeModel;
+    if (activeProvider.default_model && exists(activeProvider.default_model)) {
+      return activeProvider.default_model;
     }
-    const stored = getStoredModel(activeProvider.id);
-    if (stored) {
-      setSelectedModelKey(stored);
-    } else {
-      setSelectedModelKey(activeProvider.default_model || availableModels[0]?.key || '');
-    }
-  }, [activeProvider?.id, availableModels.length]);
+    return availableModels[0]?.key || activeProvider.default_model || '';
+  }, [activeProvider, activeModel, availableModels]);
 
   // Close model dropdown when clicking outside
   useEffect(() => {
@@ -74,10 +46,7 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
   }, [showModelDropdown]);
 
   const handleModelChange = (modelKey: string) => {
-    if (activeProvider) {
-      setStoredModel(activeProvider.id, modelKey);
-    }
-    setSelectedModelKey(modelKey);
+    setActiveModel(modelKey);
     setShowModelDropdown(false);
   };
 
@@ -136,7 +105,6 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
   const outputTokens = tokenStats?.total_output_tokens ?? 0;
   const reasoningTokens = tokenStats?.reasoning_output_tokens ?? 0;
   const usedTokens = inputTokens + outputTokens;
-  const remainingTokens = maxTokens ? Math.max(0, maxTokens - usedTokens) : null;
 
   if (!activeProvider) {
     return (
@@ -151,18 +119,12 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
   }
 
   return (
-    <div className="border-t theme-border theme-main">
+    <div className="theme-main">
       <div className="max-w-3xl mx-auto px-4 py-3">
         {/* Token stats (right-aligned, above input) */}
         {maxTokens && (
-          <div className={`text-xs font-mono flex items-center justify-center gap-3 mb-2 ${
-            usedTokens > 0 && remainingTokens! < maxTokens * 0.8
-              ? remainingTokens! < maxTokens * 0.5
-                ? 'text-red-400'
-                : 'text-yellow-400'
-              : 'text-gray-500'
-          }`}>
-            <span>
+          <div className="text-xs font-mono flex items-center justify-center gap-3 mb-2">
+            <span className="theme-text-muted">
               {usedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens
               <span className="theme-text-muted ml-1">
                 ({(((maxTokens - usedTokens) / maxTokens) * 100).toFixed(1)}% left)
@@ -171,7 +133,12 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
             <span className="theme-text-muted">
               ↑ {inputTokens.toLocaleString()} · ↓ {outputTokens.toLocaleString()}
               {reasoningTokens > 0 && (
-                <> · 🧠 {reasoningTokens.toLocaleString()}</>
+                <>
+                  {' · '}
+                  <Brain className="w-3 h-3 inline-block align-[-1px]" />
+                  {' '}
+                  {reasoningTokens.toLocaleString()}
+                </>
               )}
             </span>
           </div>
@@ -266,15 +233,22 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
             </div>
 
             <button
-              onClick={handleSubmit}
-              disabled={!input.trim()}
+              onClick={isStreaming ? onStop : handleSubmit}
+              disabled={!isStreaming && !input.trim()}
+              title={isStreaming ? 'Stop generating' : 'Send'}
               className={`p-2 rounded-full transition-all flex-shrink-0 ${
-                input.trim()
+                isStreaming
                   ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
-                  : 'bg-transparent theme-text-muted cursor-not-allowed'
+                  : input.trim()
+                    ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
+                    : 'bg-transparent theme-text-muted cursor-not-allowed'
               }`}
             >
-              <Send className="w-4 h-4" />
+              {isStreaming ? (
+                <Square className="w-4 h-4 fill-current" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </button>
           </div>
         </div>

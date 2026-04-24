@@ -11,10 +11,9 @@ import { X, Plus, Save, Trash2, Eye, EyeOff, Loader2, Pencil, ChevronDown, Chevr
 
 const FONT_FAMILY_OPTIONS: { value: ChatFontFamily; label: string }[] = [
   { value: 'system', label: 'System Default' },
-  { value: 'sans', label: 'Sans Serif' },
-  { value: 'serif', label: 'Serif' },
-  { value: 'mono', label: 'Monospace' },
-  { value: 'inter', label: 'Inter' },
+  { value: 'sans', label: 'Inter (Sans)' },
+  { value: 'serif', label: 'Noto Serif' },
+  { value: 'mono', label: 'JetBrains Mono' },
 ];
 
 const API_TYPE_OPTIONS: { value: 'openai' | 'lmstudio'; label: string }[] = [
@@ -462,54 +461,47 @@ function ProviderForm({
 
         {/* Fetched models list */}
         {availableModels.length > 0 && (
-          <div className="mt-3">
+          <div className="mt-3 border theme-border-light rounded-lg overflow-hidden">
             <button
               type="button"
               onClick={() => setModelsListExpanded(!modelsListExpanded)}
-              className="text-xs theme-text-secondary hover-theme-text-primary flex items-center gap-1 transition-colors"
+              className="w-full px-3 py-2 theme-input flex items-center justify-between text-xs theme-text-secondary hover-theme-text-primary transition-colors"
             >
-              {modelsListExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              {availableModels.length} model{availableModels.length !== 1 ? 's' : ''} fetched
-              <span className="theme-text-muted">
-                ({availableModels.filter((m) => modelEnabled[m] !== false).length} enabled)
+              <span className="flex items-center gap-2">
+                {modelsListExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                <span className="theme-text-primary font-medium">
+                  {availableModels.length} model{availableModels.length !== 1 ? 's' : ''}
+                </span>
+                <span className="theme-text-muted">
+                  · {availableModels.filter((m) => modelEnabled[m] !== false).length} enabled
+                </span>
               </span>
             </button>
 
             {modelsListExpanded && (
-              <div className="mt-2 space-y-2 max-h-80 overflow-y-auto pr-1">
+              <div className="max-h-80 overflow-y-auto border-t theme-border-light divide-y divide-[color:var(--bg-border-light)]">
                 {availableModels.map((modelKey) => {
                   const modelObj = modelObjectsMap[modelKey] as Record<string, unknown> | undefined;
                   const info = modelObj ? strategy?.extractModelInfo(modelObj) : null;
                   const override = modelOverrides[modelKey];
                   const isEnabled = modelEnabled[modelKey] !== false;
                   const isDefault = modelKey === defaultModel;
+                  const caps = info?.capabilities
+                    ? [
+                        info.capabilities.vision && 'vision',
+                        info.capabilities.trained_for_tool_use && 'tools',
+                        info.capabilities.reasoning && 'reasoning',
+                      ].filter(Boolean) as string[]
+                    : [];
 
                   return (
                     <div
                       key={modelKey}
-                      className={`border rounded-lg p-2.5 transition-colors ${
-                        isDefault
-                          ? 'border-[var(--accent)]/50 bg-[var(--accent)]/5'
-                          : 'border-gray-700 bg-gray-900/30'
+                      className={`px-3 py-2.5 transition-colors ${
+                        isDefault ? 'bg-[var(--accent)]/5' : ''
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        {/* Default model heart */}
-                        <button
-                          type="button"
-                          onClick={() => setDefaultModel(modelKey)}
-                          disabled={!isEnabled}
-                          className={`flex items-center justify-center flex-shrink-0 transition-colors ${
-                            isEnabled ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-40'
-                          }`}
-                          title="Set as default model"
-                        >
-                          {isDefault ? (
-                            <Heart className="w-4 h-4 text-[var(--accent)] fill-[var(--accent)]" />
-                          ) : (
-                            <Heart className="w-4 h-4 theme-text-muted" />
-                          )}
-                        </button>
+                      <div className="flex items-center gap-2.5">
                         {/* Enable/disable checkbox */}
                         <button
                           type="button"
@@ -520,48 +512,72 @@ function ProviderForm({
                           className={`w-4 h-4 rounded flex items-center justify-center border transition-colors flex-shrink-0 ${
                             isEnabled
                               ? 'border-[var(--accent)] bg-[var(--accent)]'
-                              : 'border-gray-600 hover:border-gray-500'
+                              : 'border-[color:var(--bg-border-light)] hover:border-[color:var(--text-muted)]'
                           }`}
+                          title={isEnabled ? 'Disable model' : 'Enable model'}
                         >
                           {isEnabled && <Check className="w-3 h-3 text-white" />}
                         </button>
-                        <span className={`text-xs font-mono flex-1 truncate ${isEnabled ? 'theme-text-primary' : 'theme-text-muted line-through'}`}>
+
+                        {/* Model name */}
+                        <span
+                          className={`text-xs font-mono flex-1 truncate ${
+                            isEnabled ? 'theme-text-primary' : 'theme-text-muted line-through'
+                          }`}
+                          title={modelKey}
+                        >
                           {modelKey}
                         </span>
-                      </div>
 
-                      {isEnabled && (
-                        <div className="mt-2 ml-6 flex flex-wrap gap-3">
-                          <div className="flex items-center gap-1.5">
-                            <label className="text-[10px] text-gray-500 w-16 flex-shrink-0">Max ctx:</label>
-                            <input
-                              type="number"
-                              value={override?.max_context ?? (info?.max_context_length ?? '')}
-                              onChange={(e) => {
-                                const val = e.target.value ? Number(e.target.value) : undefined;
-                                setModelOverrides((prev) => ({
-                                  ...prev,
-                                  [modelKey]: { ...prev[modelKey], max_context: val },
-                                }));
-                              }}
-                              placeholder="auto"
-                              className="w-24 px-1.5 py-0.5 theme-input border theme-border-light rounded text-xs theme-text-primary focus:outline-none focus:border-gray-500"
-                            />
-                          </div>
-                          {info?.capabilities && (
-                            <div className="flex items-center gap-1">
-                              <label className="text-[10px] text-gray-500 w-16 flex-shrink-0">Caps:</label>
-                              <span className="text-[10px] theme-text-secondary">
-                                {[
-                                  info.capabilities.vision && 'vision',
-                                  info.capabilities.trained_for_tool_use && 'tools',
-                                  info.capabilities.reasoning && 'reasoning',
-                                ].filter(Boolean).join(', ') || 'basic'}
+                        {/* Capability chips */}
+                        {isEnabled && caps.length > 0 && (
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {caps.map((c) => (
+                              <span
+                                key={c}
+                                className="text-[10px] px-1.5 py-0.5 rounded theme-input theme-text-secondary border theme-border-light"
+                              >
+                                {c}
                               </span>
-                            </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Max context input */}
+                        {isEnabled && (
+                          <input
+                            type="number"
+                            value={override?.max_context ?? (info?.max_context_length ?? '')}
+                            onChange={(e) => {
+                              const val = e.target.value ? Number(e.target.value) : undefined;
+                              setModelOverrides((prev) => ({
+                                ...prev,
+                                [modelKey]: { ...prev[modelKey], max_context: val },
+                              }));
+                            }}
+                            placeholder="ctx"
+                            className="w-20 px-2 py-1 theme-input border theme-border-light rounded text-[11px] font-mono theme-text-primary focus:outline-none focus:border-[color:var(--accent)] flex-shrink-0"
+                            title="Max context length (tokens)"
+                          />
+                        )}
+
+                        {/* Default model heart */}
+                        <button
+                          type="button"
+                          onClick={() => setDefaultModel(modelKey)}
+                          disabled={!isEnabled}
+                          className={`flex items-center justify-center flex-shrink-0 transition-opacity ${
+                            isEnabled ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-30'
+                          }`}
+                          title={isDefault ? 'Default model' : 'Set as default'}
+                        >
+                          {isDefault ? (
+                            <Heart className="w-4 h-4 text-[var(--accent)] fill-[var(--accent)]" />
+                          ) : (
+                            <Heart className="w-4 h-4 theme-text-muted" />
                           )}
-                        </div>
-                      )}
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -599,17 +615,21 @@ function ProvidersTab() {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium theme-text-primary">Providers</h3>
-        <button
-          onClick={() => {
-            setEditingProvider(undefined);
-            setShowForm(true);
-          }}
-          className="text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1"
-        >
-          <Plus className="w-3 h-3" />
-          Add Provider
-        </button>
+        <h3 className="text-sm font-medium theme-text-primary">
+          {showForm ? (editingProvider ? 'Edit Provider' : 'Add Provider') : 'Providers'}
+        </h3>
+        {!showForm && (
+          <button
+            onClick={() => {
+              setEditingProvider(undefined);
+              setShowForm(true);
+            }}
+            className="text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1"
+          >
+            <Plus className="w-3 h-3" />
+            Add Provider
+          </button>
+        )}
       </div>
 
       {showForm ? (

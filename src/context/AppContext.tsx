@@ -2,9 +2,9 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 import type { Conversation, Message, Provider, ThemeMode, ChatSettings, ChatFontFamily } from '../types';
 
 export const CHAT_FONT_STACKS: Record<ChatFontFamily, string> = {
-  system: `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`,
-  sans: `system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
-  serif: `Georgia, Cambria, 'Times New Roman', Times, serif`,
+  system: `Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`,
+  sans: `Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
+  serif: `'Noto Serif', Georgia, Cambria, 'Times New Roman', Times, serif`,
   mono: `'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace`,
   inter: `Inter, system-ui, -apple-system, sans-serif`,
 };
@@ -24,9 +24,12 @@ function loadChatSettings(): ChatSettings {
     const parsed = JSON.parse(raw);
     return {
       system_prompt: typeof parsed.system_prompt === 'string' ? parsed.system_prompt : '',
-      font_family: CHAT_FONT_STACKS[parsed.font_family as ChatFontFamily]
-        ? (parsed.font_family as ChatFontFamily)
-        : 'system',
+      font_family:
+        parsed.font_family === 'inter'
+          ? 'sans'
+          : CHAT_FONT_STACKS[parsed.font_family as ChatFontFamily]
+            ? (parsed.font_family as ChatFontFamily)
+            : 'system',
       font_size:
         typeof parsed.font_size === 'number' &&
         (CHAT_FONT_SIZE_STEPS as readonly number[]).includes(parsed.font_size)
@@ -62,6 +65,8 @@ interface AppContextType {
   messages: Message[];
   providers: Provider[];
   activeProvider: Provider | null;
+  activeModel: string;
+  setActiveModel: (modelKey: string) => void;
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
   chatSettings: ChatSettings;
@@ -82,7 +87,8 @@ interface AppContextType {
     reasoning?: string,
     inputTokens?: number,
     outputTokens?: number,
-    reasoningTokens?: number
+    reasoningTokens?: number,
+    durationMs?: number
   ) => Promise<Message>;
   deleteMessages: (conversationId: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
@@ -105,12 +111,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [activeProvider, setActiveProviderState] = useState<Provider | null>(null);
+  const [activeModel, setActiveModel] = useState<string>('');
 
   const setActiveProvider = useCallback((p: Provider | null) => {
     setActiveProviderState(p);
+    // Reset the active model to the provider's default (or first enabled model)
+    // whenever the provider changes, so we never leave a stale model selected.
     if (p) {
+      const firstEnabled = p.models?.find((m) => m.enabled !== false)?.key;
+      setActiveModel(p.default_model || firstEnabled || '');
       localStorage.setItem('active-provider-id', p.id);
     } else {
+      setActiveModel('');
       localStorage.removeItem('active-provider-id');
     }
   }, []);
@@ -221,7 +233,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reasoning?: string,
       inputTokens?: number,
       outputTokens?: number,
-      reasoningTokens?: number
+      reasoningTokens?: number,
+      durationMs?: number
     ) => {
       const msg = await window.chatApi.messages.add(
         conversationId,
@@ -231,7 +244,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         reasoning,
         inputTokens,
         outputTokens,
-        reasoningTokens
+        reasoningTokens,
+        durationMs
       );
       setMessages((prev) => [...prev, msg as Message]);
       return msg as Message;
@@ -303,6 +317,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     messages,
     providers,
     activeProvider,
+    activeModel,
+    setActiveModel,
     theme,
     setTheme,
     chatSettings,

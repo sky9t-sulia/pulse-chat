@@ -23,6 +23,10 @@ interface Message {
   reasoning?: string;
   created_at: number;
   model?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  reasoning_tokens?: number;
+  duration_ms?: number;
 }
 
 interface Provider {
@@ -72,7 +76,8 @@ interface ChatAPI {
       reasoning?: string,
       inputTokens?: number,
       outputTokens?: number,
-      reasoningTokens?: number
+      reasoningTokens?: number,
+      durationMs?: number
     ) => Promise<Message>;
     delete: (conversationId: string) => Promise<void>;
     deleteOne: (id: string) => Promise<void>;

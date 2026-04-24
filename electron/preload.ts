@@ -60,8 +60,29 @@ const chatApi = {
   messages: {
     get: (conversationId: string) =>
       ipcRenderer.invoke('messages:get', conversationId) as Promise<Message[]>,
-    add: (conversationId: string, role: string, content: string, model?: string, reasoning?: string) =>
-      ipcRenderer.invoke('messages:add', conversationId, role, content, model, reasoning) as Promise<Message>,
+    add: (
+      conversationId: string,
+      role: string,
+      content: string,
+      model?: string,
+      reasoning?: string,
+      inputTokens?: number,
+      outputTokens?: number,
+      reasoningTokens?: number,
+      durationMs?: number,
+    ) =>
+      ipcRenderer.invoke(
+        'messages:add',
+        conversationId,
+        role,
+        content,
+        model,
+        reasoning,
+        inputTokens,
+        outputTokens,
+        reasoningTokens,
+        durationMs,
+      ) as Promise<Message>,
     delete: (conversationId: string) =>
       ipcRenderer.invoke('messages:delete', conversationId),
     deleteOne: (id: string) =>

@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
-import { StopCircle, Loader2, ChevronDown, ChevronUp, Plus, MessageSquare, RotateCcw } from 'lucide-react';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import { ChevronDown, ChevronUp, Plus, MessageSquare, RotateCcw, Trash2, RefreshCw } from 'lucide-react';
 import type { Message } from '../types';
 import type { LoadingPhase } from '../context/useChat';
 
@@ -14,9 +16,11 @@ interface Props {
   streamingReasoningContent: string;
   isStreaming: boolean;
   loadingPhase: LoadingPhase;
-  onStop: () => void;
   scrollRef: React.Ref<HTMLDivElement>;
-  onRegenerate?: () => void;
+  scrollContainerRef: React.Ref<HTMLDivElement>;
+  onResendMessage?: (id: string) => void;
+  onRegenerateMessage?: (id: string) => void;
+  onDeleteMessage?: (id: string) => void;
 }
 
 function CopyButton({ code }: { code: string }) {
@@ -82,16 +86,17 @@ function CodeBlock({
 function MessageContent({ content }: { content: string }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkMath]}
+      rehypePlugins={[rehypeKatex]}
       components={{
         pre({ children }) {
           return <>{children}</>;
         },
         code({ className, children, ...props }) {
-          const match = /language-(\w+)/.exec(className || '');
+          const lang = className?.replace(/^language-/, '') || '';
           const codeStr = String(children).replace(/\n$/, '');
 
-          if (!match) {
+          if (!lang) {
             return (
               <code className={className} {...props}>
                 {children}
@@ -99,12 +104,12 @@ function MessageContent({ content }: { content: string }) {
             );
           }
 
-          return <CodeBlock language={match[1]} code={codeStr} />;
+          return <CodeBlock language={lang} code={codeStr} />;
         },
         table({ children }) {
           return (
             <div className="my-4 overflow-x-auto">
-              <table className="min-w-full border-collapse border theme-border text-sm">
+              <table className="min-w-full border-collapse text-sm">
                 {children}
               </table>
             </div>
@@ -116,7 +121,7 @@ function MessageContent({ content }: { content: string }) {
         th({ children, ...props }) {
           return (
             <th
-              className="border theme-border px-4 py-2 text-left font-semibold"
+              className="border-b theme-border px-4 py-2 text-left font-semibold"
               {...props}
             >
               {children}
@@ -126,7 +131,7 @@ function MessageContent({ content }: { content: string }) {
         td({ children, ...props }) {
           return (
             <td
-              className="border theme-border px-4 py-2"
+              className="border-b theme-border px-4 py-2"
               {...props}
             >
               {children}
@@ -227,30 +232,23 @@ function MessageContent({ content }: { content: string }) {
   );
 }
 
-function ReasoningBlock({
-  reasoning,
-  isStreaming,
-}: {
-  reasoning: string;
-  isStreaming?: boolean;
-}) {
+function ReasoningBlock({ reasoning }: { reasoning: string }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="mb-2 rounded-lg border theme-border overflow-hidden">
+    <div className="mb-3">
       <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-sm theme-text-secondary hover-theme-text-primary theme-sidebar-hover transition-all"
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
       >
-        {expanded ? (
-          <ChevronUp className="w-3.5 h-3.5" />
-        ) : (
-          <ChevronDown className="w-3.5 h-3.5" />
-        )}
-        <span className="font-medium">Reasoning{isStreaming ? ' (streaming…)' : ''}</span>
+        <span className="text-xs theme-text-muted">Reasoning</span>
+        {expanded
+          ? <ChevronUp className="w-3.5 h-3.5 theme-text-muted" />
+          : <ChevronDown className="w-3.5 h-3.5 theme-text-muted" />}
       </button>
       {expanded && (
-        <div className="px-4 pb-3 text-sm theme-text whitespace-pre-wrap border-t theme-border pt-3 max-h-[400px] overflow-y-auto">
+        <div className="mt-2 px-4 py-3 text-sm theme-text whitespace-pre-wrap border theme-border rounded-lg max-h-[400px] overflow-y-auto">
           {reasoning}
         </div>
       )}
@@ -258,16 +256,28 @@ function ReasoningBlock({
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+const MessageBubble = memo(function MessageBubble({
+  message,
+  disabled,
+  onResend,
+  onRegenerate,
+  onDelete,
+}: {
+  message: Message;
+  disabled?: boolean;
+  onResend?: (id: string) => void;
+  onRegenerate?: (id: string) => void;
+  onDelete?: (id: string) => void;
+}) {
   const isUser = message.role === 'user';
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
+    <div className={`group flex flex-col w-full min-w-0 ${isUser ? 'items-end' : 'items-start'} mb-6`}>
       <div
-        className={`chat-content ${
+        className={`chat-content max-w-full min-w-0 ${
           isUser
             ? 'theme-input px-4 py-2.5 rounded-2xl rounded-br-md'
-            : ''
+            : 'w-full'
         }`}
       >
         {isUser ? (
@@ -279,33 +289,110 @@ function MessageBubble({ message }: { message: Message }) {
           </>
         )}
       </div>
+
+      <div className="mt-1 h-6 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {isUser && onResend && (
+          <button
+            type="button"
+            onClick={() => onResend(message.id)}
+            disabled={disabled}
+            title="Resend"
+            className="p-1 rounded theme-text-muted hover-theme-text-primary hover:theme-sidebar-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {!isUser && onRegenerate && (
+          <button
+            type="button"
+            onClick={() => onRegenerate(message.id)}
+            disabled={disabled}
+            title="Regenerate"
+            className="p-1 rounded theme-text-muted hover-theme-text-primary hover:theme-sidebar-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete(message.id)}
+            disabled={disabled}
+            title="Delete"
+            className="p-1 rounded theme-text-muted hover:text-red-400 hover:theme-sidebar-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {!isUser && message.output_tokens && message.duration_ms ? (
+          <span
+            className="ml-1 text-[10px] font-mono theme-text-muted"
+            title={`${message.output_tokens} tokens in ${(message.duration_ms / 1000).toFixed(2)}s`}
+          >
+            {(message.output_tokens / (message.duration_ms / 1000)).toFixed(1)} tok/s
+          </span>
+        ) : null}
+      </div>
     </div>
   );
-}
+});
 
-function LoadingIndicator({ phase }: { phase: LoadingPhase }) {
-  const messages: Record<string, string> = {
-    model_load: 'Loading model...',
-    prompt_processing: 'Processing prompt...',
+function LoadingIndicator({
+  phase,
+  reasoning,
+}: {
+  phase: LoadingPhase;
+  reasoning?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const labels: Record<string, string> = {
+    waiting: 'Thinking',
+    model_load: 'Loading model',
+    prompt_processing: 'Processing prompt',
   };
 
-  const phaseLabel = messages[phase.kind] || '';
+  const phaseLabel = labels[phase.kind] || 'Thinking';
   const progress = phase.kind === 'model_load' || phase.kind === 'prompt_processing'
     ? Math.round((phase.progress ?? 0) * 100)
     : undefined;
 
+  const hasReasoning = !!reasoning;
+  const Wrapper: React.ElementType = hasReasoning ? 'button' : 'div';
+
   return (
-    <div className="flex justify-center items-center gap-2 py-4">
-      <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-      <span className="text-xs theme-text-muted">
-        {phaseLabel}
-        {progress !== undefined && ` ${progress}%`}
-      </span>
+    <div className="mb-6">
+      <Wrapper
+        type={hasReasoning ? 'button' : undefined}
+        onClick={hasReasoning ? () => setExpanded((v) => !v) : undefined}
+        className={`flex items-center gap-3 ${
+          hasReasoning ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''
+        }`}
+      >
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-current theme-text-secondary thinking-dot" style={{ animationDelay: '0ms' }} />
+          <span className="w-2 h-2 rounded-full bg-current theme-text-secondary thinking-dot" style={{ animationDelay: '160ms' }} />
+          <span className="w-2 h-2 rounded-full bg-current theme-text-secondary thinking-dot" style={{ animationDelay: '320ms' }} />
+        </div>
+        <span className="text-xs theme-text-muted">
+          {phaseLabel}
+          {progress !== undefined && ` · ${progress}%`}
+        </span>
+        {hasReasoning && (
+          expanded
+            ? <ChevronUp className="w-3.5 h-3.5 theme-text-muted" />
+            : <ChevronDown className="w-3.5 h-3.5 theme-text-muted" />
+        )}
+      </Wrapper>
+      {hasReasoning && expanded && (
+        <div className="mt-2 px-4 py-3 text-sm theme-text whitespace-pre-wrap border theme-border rounded-lg max-h-[400px] overflow-y-auto">
+          {reasoning}
+        </div>
+      )}
     </div>
   );
 }
 
-export default function ChatArea({ streamingContent, streamingReasoningContent, isStreaming, loadingPhase, onStop, scrollRef, onRegenerate }: Props) {
+export default function ChatArea({ streamingContent, streamingReasoningContent, isStreaming, loadingPhase, scrollRef, scrollContainerRef, onResendMessage, onRegenerateMessage, onDeleteMessage }: Props) {
   const {
     activeConversationId,
     messages,
@@ -314,7 +401,7 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
     setActiveConversationId,
     activeProvider,
   } = useApp();
-  const showLoading = isStreaming && loadingPhase.kind !== 'idle' && loadingPhase.kind !== 'streaming';
+  const showLoading = isStreaming && !streamingContent;
 
   if (!activeConversationId) {
     const recent = conversations.slice(0, 5);
@@ -391,62 +478,59 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
     );
   }
 
+  const activeConversation = conversations.find((c) => c.id === activeConversationId);
+
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0">
-      <div className="flex-1 overflow-y-auto scroll-smooth min-h-0">
-        <div className="max-w-3xl mx-auto px-8">
+    <div className="flex-1 flex flex-col h-full min-h-0 relative">
+      {activeConversation && (
+        <div className="absolute top-0 left-0 right-0 z-10 pointer-events-none">
+          <div className="px-6 py-3 theme-main pointer-events-auto">
+            <h2 className="text-sm font-base-bold theme-text-primary truncate max-w-3xl" title={activeConversation.title}>
+              {activeConversation.title}
+            </h2>
+          </div>
+          <div
+            className="h-7"
+            style={{
+              background: 'linear-gradient(to bottom, var(--bg-main), transparent)',
+            }}
+          />
+        </div>
+      )}
+      <div className="flex-1 overflow-y-auto scroll-smooth min-h-0" ref={scrollContainerRef}>
+        <div className={`max-w-3xl mx-auto px-8 ${activeConversation ? 'pt-20' : 'pt-8'}`}>
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              disabled={isStreaming}
+              onResend={onResendMessage}
+              onRegenerate={onRegenerateMessage}
+              onDelete={onDeleteMessage}
+            />
           ))}
-
-          {!isStreaming &&
-            onRegenerate &&
-            messages.length > 0 &&
-            messages[messages.length - 1].role === 'assistant' && (
-              <div className="flex justify-start mb-6 -mt-4">
-                <button
-                  onClick={onRegenerate}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs theme-text-secondary hover-theme-text-primary theme-sidebar-hover border theme-border rounded-full transition-all"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  Regenerate
-                </button>
-              </div>
-            )}
-
-          {streamingReasoningContent && (
-            <div className="flex justify-start mb-0">
-              <div className="chat-content max-w-[85%]">
-                <ReasoningBlock reasoning={streamingReasoningContent} isStreaming />
-              </div>
-            </div>
-          )}
 
           {streamingContent && (
             <div className="flex justify-start mb-4">
-              <div className="chat-content max-w-[85%]">
+              <div className="chat-content max-w-[85%] w-full">
+                {streamingReasoningContent && (
+                  <ReasoningBlock reasoning={streamingReasoningContent} />
+                )}
                 <MessageContent content={streamingContent} />
               </div>
             </div>
           )}
 
-          {showLoading && <LoadingIndicator phase={loadingPhase} />}
+          {showLoading && (
+            <LoadingIndicator
+              phase={loadingPhase}
+              reasoning={streamingReasoningContent || undefined}
+            />
+          )}
 
           <div ref={scrollRef} />
         </div>
       </div>
-
-      {isStreaming && (
-        <div className="flex justify-center pb-2">
-          <button
-            onClick={onStop}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs theme-text-secondary hover-theme-text-primary theme-sidebar-hover border theme-border rounded-full transition-all"
-          >
-            <StopCircle className="w-3.5 h-3.5" />
-            Stop generating
-          </button>
-        </div>
-      )}
     </div>
   );
 }

@@ -32,6 +32,7 @@
   --accent-hover: #d97757;
   --bg-chat-input: #30302d;
   --chat-input-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --inline-code: #f4a9a9;
 }
 
 .light {
@@ -62,12 +63,13 @@
   --accent-hover: #b04e2d;
   --bg-chat-input: #ffffff;
   --chat-input-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --inline-code: #8d2525;
 }
 
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
@@ -106,17 +108,32 @@ body {
 
 /* ─── Chat message area ───────────────────────────────────── */
 
+.font-base-bold {
+    font-size: .875rem;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
 .chat-content {
   word-wrap: break-word;
   overflow-wrap: break-word;
   font-size: var(--chat-font-size, 16px);
 }
 
-/* Font family applies only to prose body text — not headings, code, tables, or chrome. */
+/* Font family applies to prose body text, headings, and tables — not code or chrome. */
 .chat-content p,
 .chat-content li,
-.chat-content blockquote {
-  font-family: var(--chat-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+.chat-content blockquote,
+.chat-content h1,
+.chat-content h2,
+.chat-content h3,
+.chat-content h4,
+.chat-content h5,
+.chat-content h6,
+.chat-content table,
+.chat-content th,
+.chat-content td {
+  font-family: var(--chat-font-family, Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
 }
 
 .chat-content p {
@@ -133,7 +150,7 @@ body {
 }
 
 .chat-content pre {
-  background: var(--bg-sidebar);
+  background: var(--bg-chat-input);
   border-radius: 8px;
   padding: 12px 16px;
   overflow-x: auto;
@@ -146,11 +163,15 @@ body {
   font-size: 0.875em;
 }
 
+.chat-content code:not([class*='language-']) {
+  border: 1px solid color-mix(in srgb, var(--text-primary) 15%, transparent);
+}
+
 .chat-content :not(pre) code {
   background: var(--bg-sidebar-active);
   padding: 2px 6px;
   border-radius: 4px;
-  color: var(--text-primary);
+  color: var(--inline-code);
 }
 
 /* Override SyntaxHighlighter theme backgrounds — the theme injects a <style> tag
@@ -171,10 +192,7 @@ body {
 
 /* ─── Tables ────────────────────────────────────────────────── */
 
-.chat-content table th {
-  background: var(--bg-sidebar-active);
-}
-
+.chat-content table th,
 .chat-content table td {
   background: transparent;
 }
@@ -190,7 +208,7 @@ body {
 
 .code-block-wrapper {
   position: relative;
-  background: var(--bg-sidebar);
+  background: var(--bg-chat-input);
 }
 
 .code-block-header {
@@ -198,16 +216,11 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 8px 16px;
-  background: var(--bg-main-hover);
+  background: var(--bg-chat-input);
   border-radius: 8px 8px 0 0;
   font-size: 0.75rem;
   color: var(--text-secondary);
   font-family: 'JetBrains Mono', Consolas, monospace;
-}
-
-.light .code-block-header {
-  background: var(--bg-main-hover);
-  color: var(--text-secondary);
 }
 
 .code-block-wrapper pre {
@@ -243,6 +256,23 @@ body {
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+/* ─── "Thinking" dot animation ────────────────────────────── */
+
+@keyframes thinking-dot {
+  0%, 80%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.thinking-dot {
+  animation: thinking-dot 1.2s ease-in-out infinite;
 }
 
 /* ─── Settings modal ──────────────────────────────────────── */

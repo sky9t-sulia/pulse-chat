@@ -107,6 +107,11 @@ async function initDatabase() {
   } catch {
     // Column already exists or migration not needed
   }
+  try {
+    db.run(`ALTER TABLE messages ADD COLUMN duration_ms INTEGER DEFAULT 0`);
+  } catch {
+    // Column already exists or migration not needed
+  }
 
   // Save on shutdown
   app.on('before-quit', () => {
@@ -245,7 +250,7 @@ ipcMain.handle('conversations:updateTitle', (_e, id: string, title: string) => {
 
 ipcMain.handle('messages:get', (_e, conversationId: string) => {
   return query<any>(
-    `SELECT id, role, content, reasoning, created_at, model, input_tokens, output_tokens, reasoning_tokens FROM messages WHERE conversation_id = ? ORDER BY created_at ASC`,
+    `SELECT id, role, content, reasoning, created_at, model, input_tokens, output_tokens, reasoning_tokens, duration_ms FROM messages WHERE conversation_id = ? ORDER BY created_at ASC`,
     [conversationId]
   );
 });
@@ -261,12 +266,13 @@ ipcMain.handle(
     reasoning?: string,
     inputTokens?: number,
     outputTokens?: number,
-    reasoningTokens?: number
+    reasoningTokens?: number,
+    durationMs?: number
   ) => {
     const id = uuidv4();
     const now = Date.now();
     run(
-      'INSERT INTO messages (id, conversation_id, role, content, reasoning, created_at, model, input_tokens, output_tokens, reasoning_tokens) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO messages (id, conversation_id, role, content, reasoning, created_at, model, input_tokens, output_tokens, reasoning_tokens, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         id,
         conversationId,
@@ -278,6 +284,7 @@ ipcMain.handle(
         inputTokens || 0,
         outputTokens || 0,
         reasoningTokens || 0,
+        durationMs || 0,
       ]
     );
     run('UPDATE conversations SET updated_at = ? WHERE id = ?', [now, conversationId]);
@@ -292,6 +299,7 @@ ipcMain.handle(
       input_tokens: inputTokens || 0,
       output_tokens: outputTokens || 0,
       reasoning_tokens: reasoningTokens || 0,
+      duration_ms: durationMs || 0,
     };
   }
 );

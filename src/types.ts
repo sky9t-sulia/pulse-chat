@@ -16,6 +16,7 @@ export interface Message {
   input_tokens?: number;
   output_tokens?: number;
   reasoning_tokens?: number;
+  duration_ms?: number;
 }
 
 export interface ProviderModel {

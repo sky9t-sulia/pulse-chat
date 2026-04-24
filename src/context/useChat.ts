@@ -5,6 +5,7 @@ import type { Provider } from '../types';
 type ApiKind = 'openai' | 'lmstudio-chat' | 'lmstudio-responses' | 'lmstudio-messages';
 export type LoadingPhase =
   | { kind: 'idle' }
+  | { kind: 'waiting' }
   | { kind: 'model_load'; progress: number }
   | { kind: 'prompt_processing'; progress: number }
   | { kind: 'streaming' };
@@ -13,6 +14,7 @@ export interface TokenStats {
   input_tokens: number;
   total_output_tokens: number;
   reasoning_output_tokens: number;
+  tokens_per_second?: number;
 }
 
 function getApiKind(provider: Provider): ApiKind {
@@ -23,13 +25,29 @@ function getApiKind(provider: Provider): ApiKind {
   return 'openai';
 }
 
+// Hidden base system prompt — prepended to the user-provided system prompt.
+// Tells the model how to format output so it renders correctly in the UI.
+const BASE_SYSTEM_PROMPT = [
+  'Formatting rules for all responses:',
+  '- Use GitHub-flavored markdown for headings, lists, tables, and fenced code blocks.',
+  '- For code, use fenced blocks with a language tag (```python, ```ts, …). Do not wrap prose in code fences.',
+  '- Keep answers concise by default; expand only when the user asks for detail.',
+].join('\n');
+
+function composeSystemPrompt(userPrompt: string): string {
+  const trimmed = userPrompt.trim();
+  if (!trimmed) return BASE_SYSTEM_PROMPT;
+  return `${BASE_SYSTEM_PROMPT}\n\n---\n\n${trimmed}`;
+}
+
 function buildRequestBody(
   kind: ApiKind,
   model: string,
   messages: { role: string; content: string }[],
-  systemPrompt: string,
+  userSystemPrompt: string,
   previousResponseId?: string
 ): Record<string, unknown> {
+  const systemPrompt = composeSystemPrompt(userSystemPrompt);
   const withSystem = systemPrompt
     ? [{ role: 'system', content: systemPrompt }, ...messages]
     : messages;
@@ -191,8 +209,16 @@ export function useChat() {
   }, [activeConversationId, isStreaming, messages]);
 
   const scrollRef = useRef<HTMLDivElement>(null!);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const threshold = 120;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+    if (isNearBottom) {
+      scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, streamingContent, streamingReasoningContent]);
 
   const send = useCallback(
@@ -220,12 +246,15 @@ export function useChat() {
       );
 
       setIsStreaming(true);
+      setLoadingPhase({ kind: 'waiting' });
       setStreamingContent('');
       setStreamingReasoningContent('');
 
       let accumulatedContent = '';
       let accumulatedReasoningContent = '';
       let finalStats: TokenStats | null = null;
+      let firstContentAt: number | null = null;
+      const requestStartedAt = Date.now();
 
       try {
         const fetchInit: RequestInit = {
@@ -314,6 +343,10 @@ export function useChat() {
                   const eventType = currentEventType || json.type;
 
                   switch (eventType) {
+                    case 'chat.start':
+                      // Server has accepted the request and is about to start work.
+                      setLoadingPhase({ kind: 'waiting' });
+                      break;
                     case 'model_load.start':
                       setLoadingPhase({ kind: 'model_load', progress: 0 });
                       break;
@@ -327,7 +360,7 @@ export function useChat() {
                       setLoadingPhase({ kind: 'model_load', progress: json.progress ?? 0 });
                       break;
                     case 'model_load.end':
-                      setLoadingPhase({ kind: 'idle' });
+                      setLoadingPhase({ kind: 'waiting' });
                       break;
                     case 'prompt_processing.start':
                       setLoadingPhase({ kind: 'prompt_processing', progress: 0 });
@@ -336,7 +369,7 @@ export function useChat() {
                       setLoadingPhase({ kind: 'prompt_processing', progress: json.progress ?? 0 });
                       break;
                     case 'prompt_processing.end':
-                      setLoadingPhase({ kind: 'idle' });
+                      setLoadingPhase({ kind: 'waiting' });
                       break;
                     case 'reasoning.start':
                     case 'reasoning_start':
@@ -351,6 +384,7 @@ export function useChat() {
                       setLoadingPhase({ kind: 'streaming' });
                       if (json.content) {
                         accumulatedContent += json.content;
+                        if (firstContentAt === null) firstContentAt = Date.now();
                         setStreamingContent(accumulatedContent);
                       }
                       // LM Studio may include reasoning alongside content in message delta
@@ -375,6 +409,7 @@ export function useChat() {
                       setLoadingPhase({ kind: 'streaming' });
                       if (json.text) {
                         accumulatedContent += json.text;
+                        if (firstContentAt === null) firstContentAt = Date.now();
                         setStreamingContent(accumulatedContent);
                       }
                       break;
@@ -382,6 +417,7 @@ export function useChat() {
                       setLoadingPhase({ kind: 'streaming' });
                       if (json.delta?.text) {
                         accumulatedContent += json.delta.text;
+                        if (firstContentAt === null) firstContentAt = Date.now();
                         setStreamingContent(accumulatedContent);
                       }
                       break;
@@ -401,7 +437,8 @@ export function useChat() {
                             setStreamingReasoningContent(accumulatedReasoningContent);
                           } else if (item.type === 'message' && item.content) {
                             accumulatedContent = item.content;
-                            setStreamingContent(accumulatedContent);
+                            if (firstContentAt === null) firstContentAt = Date.now();
+                        setStreamingContent(accumulatedContent);
                           }
                         }
                       }
@@ -426,6 +463,7 @@ export function useChat() {
                       if (json.choices?.[0]?.delta?.content) {
                         setLoadingPhase({ kind: 'streaming' });
                         accumulatedContent += json.choices[0].delta.content;
+                        if (firstContentAt === null) firstContentAt = Date.now();
                         setStreamingContent(accumulatedContent);
                       }
                       // Reasoning for OpenAI-compatible streams:
@@ -476,6 +514,24 @@ export function useChat() {
         const isFirstAssistant = !messagesRef.current.some((m) => m.role === 'assistant');
         const firstUserMsg = messagesRef.current.find((m) => m.role === 'user')?.content ?? '';
 
+        // Prefer provider-reported tokens_per_second (LM Studio) — convert back to
+        // a synthetic duration so the displayed tok/s matches exactly. Otherwise
+        // fall back to our own timing (OpenAI-compatible providers don't report tps).
+        let durationMs: number;
+        if (
+          finalStats?.tokens_per_second &&
+          finalStats.tokens_per_second > 0 &&
+          finalStats.total_output_tokens > 0
+        ) {
+          durationMs = Math.round(
+            (finalStats.total_output_tokens / finalStats.tokens_per_second) * 1000
+          );
+        } else {
+          durationMs = firstContentAt
+            ? Date.now() - firstContentAt
+            : Date.now() - requestStartedAt;
+        }
+
         await addMessage(
           convId,
           'assistant',
@@ -484,7 +540,8 @@ export function useChat() {
           accumulatedReasoningContent || undefined,
           finalStats?.input_tokens,
           finalStats?.total_output_tokens,
-          finalStats?.reasoning_output_tokens
+          finalStats?.reasoning_output_tokens,
+          durationMs
         );
 
         // Clear streaming state now so the saved message replaces the streaming
@@ -519,39 +576,46 @@ export function useChat() {
     setLoadingPhase({ kind: 'idle' });
   }, []);
 
-  const regenerate = useCallback(
-    async (provider: Provider, model?: string) => {
+  const resendMessage = useCallback(
+    async (messageId: string, provider: Provider, model?: string) => {
       const convId = activeConversationId;
       if (!convId || isStreaming) return;
-
       const msgs = messagesRef.current;
-      let lastAssistantIdx = -1;
-      for (let i = msgs.length - 1; i >= 0; i--) {
-        if (msgs[i].role === 'assistant') {
-          lastAssistantIdx = i;
-          break;
-        }
-      }
-      if (lastAssistantIdx === -1) return;
+      const idx = msgs.findIndex((m) => m.id === messageId);
+      if (idx === -1 || msgs[idx].role !== 'user') return;
 
-      // The user message immediately before the last assistant
-      let lastUserIdx = -1;
-      for (let i = lastAssistantIdx - 1; i >= 0; i--) {
-        if (msgs[i].role === 'user') {
-          lastUserIdx = i;
-          break;
-        }
-      }
-      if (lastUserIdx === -1) return;
-
-      const userContent = msgs[lastUserIdx].content;
-      // Drop the prior response_id so we don't pin the regenerated reply to the
-      // same server-side KV cache chain.
+      const content = msgs[idx].content;
       delete responseIdRef.current[convId];
+      for (let i = msgs.length - 1; i >= idx; i--) {
+        await deleteMessage(msgs[i].id);
+      }
+      await send(content, provider, model, convId);
+    },
+    [activeConversationId, isStreaming, deleteMessage, send]
+  );
 
-      await deleteMessage(msgs[lastAssistantIdx].id);
-      await deleteMessage(msgs[lastUserIdx].id);
+  const regenerateMessage = useCallback(
+    async (messageId: string, provider: Provider, model?: string) => {
+      const convId = activeConversationId;
+      if (!convId || isStreaming) return;
+      const msgs = messagesRef.current;
+      const idx = msgs.findIndex((m) => m.id === messageId);
+      if (idx === -1 || msgs[idx].role !== 'assistant') return;
 
+      let userIdx = -1;
+      for (let i = idx - 1; i >= 0; i--) {
+        if (msgs[i].role === 'user') {
+          userIdx = i;
+          break;
+        }
+      }
+      if (userIdx === -1) return;
+
+      const userContent = msgs[userIdx].content;
+      delete responseIdRef.current[convId];
+      for (let i = msgs.length - 1; i >= userIdx; i--) {
+        await deleteMessage(msgs[i].id);
+      }
       await send(userContent, provider, model, convId);
     },
     [activeConversationId, isStreaming, deleteMessage, send]
@@ -564,8 +628,10 @@ export function useChat() {
     loadingPhase,
     tokenStats,
     scrollRef,
+    scrollContainerRef,
     send,
     stop,
-    regenerate,
+    resendMessage,
+    regenerateMessage,
   };
 }

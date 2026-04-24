@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { useApp } from './context/AppContext';
 import { useChat } from './context/useChat';
 import Sidebar from './components/Sidebar';
@@ -7,9 +7,30 @@ import ChatInput from './components/ChatInput';
 import type { Provider } from './types';
 
 function ChatContainer() {
-  const { streamingContent, streamingReasoningContent, isStreaming, loadingPhase, tokenStats, scrollRef, send, stop, regenerate } = useChat();
-  const { activeProvider } = useApp();
+  const { streamingContent, streamingReasoningContent, isStreaming, loadingPhase, tokenStats, scrollRef, scrollContainerRef, send, stop, resendMessage, regenerateMessage } = useChat();
+  const { activeProvider, activeModel, deleteMessage } = useApp();
   const sendRef = useRef(send);
+
+  const handleResendMessage = useCallback(
+    (id: string) => {
+      if (!activeProvider) return;
+      resendMessage(id, activeProvider, activeModel || activeProvider.default_model);
+    },
+    [activeProvider, activeModel, resendMessage]
+  );
+  const handleRegenerateMessage = useCallback(
+    (id: string) => {
+      if (!activeProvider) return;
+      regenerateMessage(id, activeProvider, activeModel || activeProvider.default_model);
+    },
+    [activeProvider, activeModel, regenerateMessage]
+  );
+  const handleDeleteMessage = useCallback(
+    (id: string) => {
+      deleteMessage(id);
+    },
+    [deleteMessage]
+  );
 
   useEffect(() => {
     sendRef.current = send;
@@ -37,13 +58,13 @@ function ChatContainer() {
         streamingReasoningContent={streamingReasoningContent}
         isStreaming={isStreaming}
         loadingPhase={loadingPhase}
-        onStop={stop}
         scrollRef={scrollRef}
-        onRegenerate={
-          activeProvider ? () => regenerate(activeProvider) : undefined
-        }
+        scrollContainerRef={scrollContainerRef}
+        onResendMessage={activeProvider ? handleResendMessage : undefined}
+        onRegenerateMessage={activeProvider ? handleRegenerateMessage : undefined}
+        onDeleteMessage={handleDeleteMessage}
       />
-      <ChatInput onSend={send} tokenStats={tokenStats} />
+      <ChatInput onSend={send} tokenStats={tokenStats} isStreaming={isStreaming} onStop={stop} />
     </div>
   );
 }
