@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import path from 'path';
 import initSqlJs, { type SqlJsStatic, type Database } from 'sql.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -70,6 +70,27 @@ async function initDatabase() {
     // Column already exists or migration not needed
   }
 
+  // Migration: add api_type column if it doesn't exist yet
+  try {
+    db.run(`ALTER TABLE providers ADD COLUMN api_type TEXT NOT NULL DEFAULT 'openai'`);
+  } catch {
+    // Column already exists or migration not needed
+  }
+
+  // Migration: add endpoint column if it doesn't exist yet
+  try {
+    db.run(`ALTER TABLE providers ADD COLUMN endpoint TEXT NOT NULL DEFAULT '/v1/chat/completions'`);
+  } catch {
+    // Column already exists or migration not needed
+  }
+
+  // Migration: add models column if it doesn't exist yet
+  try {
+    db.run(`ALTER TABLE providers ADD COLUMN models TEXT NOT NULL DEFAULT '[]'`);
+  } catch {
+    // Column already exists or migration not needed
+  }
+
   // Migration: add token count columns if they don't exist yet
   try {
     db.run(`ALTER TABLE messages ADD COLUMN input_tokens INTEGER DEFAULT 0`);
@@ -126,10 +147,16 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
+  // Disable right-click context menu
+  mainWindow.webContents.on('context-menu', () => {
+    // No-op: blocks the default context menu
+  });
+
   mainWindow.show();
 }
 
 app.whenReady().then(async () => {
+  Menu.setApplicationMenu(null);
   await initDatabase();
   createWindow();
 

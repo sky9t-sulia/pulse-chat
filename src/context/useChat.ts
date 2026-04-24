@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useApp, getFullChatUrl } from './AppContext';
-import type { Provider, Message } from '../types';
+import type { Provider } from '../types';
 
 type ApiKind = 'openai' | 'lmstudio-chat' | 'lmstudio-responses' | 'lmstudio-messages';
 export type LoadingPhase =
@@ -204,11 +204,11 @@ export function useChat() {
       // Use provided model, or fall back to provider's default
       const usedModel = model || provider.default_model;
 
-      await addMessage(convId, 'user', content, usedModel);
+      const userMsg = await addMessage(convId, 'user', content, usedModel);
 
-      const chatMessages = messagesRef.current
-        .concat({ id: '', role: 'user', content, created_at: Date.now() } as Message)
-        .map((m) => ({ role: m.role, content: m.content }));
+      const current = messagesRef.current;
+      const full = current.some((m) => m.id === userMsg.id) ? current : current.concat(userMsg);
+      const chatMessages = full.map((m) => ({ role: m.role, content: m.content }));
       const kind = getApiKind(provider);
       const chatUrl = getFullChatUrl(provider);
       const body = buildRequestBody(
@@ -487,12 +487,21 @@ export function useChat() {
           finalStats?.reasoning_output_tokens
         );
 
+        // Clear streaming state now so the saved message replaces the streaming
+        // bubble immediately — otherwise a long-running title generation below
+        // would leave both visible side-by-side.
+        setStreamingContent('');
+        setStreamingReasoningContent('');
+        setIsStreaming(false);
+        setLoadingPhase({ kind: 'idle' });
+
         if (isFirstAssistant) {
           const title = await generateTitle(provider, usedModel, firstUserMsg, accumulatedContent);
           if (title) {
             await updateConversationTitle(convId, title);
           }
         }
+        return;
       }
 
       setStreamingContent('');

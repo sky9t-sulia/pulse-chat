@@ -30,7 +30,8 @@ const openaiStrategy: ProviderStrategy = {
       key: id,
       display_name: (modelObj.name as string) || id,
     };
-    const ctx = modelObj.context_length as number | undefined;
+    // OpenAI API uses "context_length", normalize to max_context_length
+    const ctx = (modelObj.context_length as number) ?? (modelObj.max_context_length as number);
     if (ctx) info.max_context_length = ctx;
     if (modelObj.format) info.format = modelObj.format as string;
     return info;

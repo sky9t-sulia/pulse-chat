@@ -28,6 +28,12 @@ function ConversationItem({
     }
   }, [editing]);
 
+  // Sync local title with prop when it changes (e.g. auto-generated title arrives),
+  // but don't stomp on user input while they're actively editing.
+  useEffect(() => {
+    if (!editing) setTitle(conversation.title);
+  }, [conversation.title, editing]);
+
   const commitEdit = () => {
     const trimmed = title.trim();
     if (trimmed && trimmed !== conversation.title) {
@@ -177,7 +183,7 @@ export default function Sidebar() {
       {collapsed && <div className="flex-1" />}
 
       {/* Footer */}
-      <div className={`border-t theme-border ${collapsed ? 'p-2 space-y-1' : 'p-3 space-y-1'}`}>
+      <div className={`${collapsed ? 'p-2 space-y-1' : 'p-3 space-y-1'}`}>
         {/* Theme toggle */}
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}

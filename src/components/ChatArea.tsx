@@ -393,8 +393,8 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
 
   return (
     <div className="flex-1 flex flex-col h-full min-h-0">
-      <div className="flex-1 overflow-y-auto scroll-smooth min-h-0 px-4 sm:px-6 lg:px-20 py-6">
-        <div className="max-w-chat-max mx-auto px-4">
+      <div className="flex-1 overflow-y-auto scroll-smooth min-h-0">
+        <div className="max-w-3xl mx-auto px-8">
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
           ))}

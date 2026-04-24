@@ -2,7 +2,7 @@
   "name": "chat-app",
   "version": "1.0.0",
   "private": true,
-  "description": "A claude.ai clone as an Electron desktop app",
+  "description": "A local first LLM desktop app",
   "author": "suleiman <suleiman@example.com>",
   "homepage": "https://github.com/suleiman/chat-app",
   "main": "dist-electron/main.js",
@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && tsc -p tsconfig.electron.json && electron dist-electron/main.js\"",
     "electron:build": "tsc -p tsconfig.json && tsc -p tsconfig.electron.json && vite build && electron-builder",
+    "build:release": "tsc -p tsconfig.json && tsc -p tsconfig.electron.json && vite build && electron-builder --linux AppImage",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
@@ -49,7 +50,7 @@
     "appId": "com.chat.app",
     "productName": "Chat App",
     "directories": {
-      "output": "dist-electron"
+      "output": "release"
     },
     "files": [
       "dist/**/*",

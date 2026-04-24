@@ -22,6 +22,7 @@ export interface ProviderModel {
   key: string;
   display_name?: string;
   model_info?: ModelInfo;
+  enabled?: boolean;
 }
 
 export interface Provider {

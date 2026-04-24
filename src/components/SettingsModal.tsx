@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   useApp,
   LMSTUDIO_ENDPOINTS,
@@ -7,7 +7,7 @@ import {
 } from '../context/AppContext';
 import { strategies } from '../context/providers';
 import type { Provider, ModelInfo, ChatFontFamily } from '../types';
-import { X, Plus, Save, Trash2, Eye, EyeOff, Loader2, Pencil } from 'lucide-react';
+import { X, Plus, Save, Trash2, Eye, EyeOff, Loader2, Pencil, ChevronDown, ChevronUp, Check, RefreshCw, Heart } from 'lucide-react';
 
 const FONT_FAMILY_OPTIONS: { value: ChatFontFamily; label: string }[] = [
   { value: 'system', label: 'System Default' },
@@ -54,42 +54,25 @@ function ProviderForm({
   const [defaultModel, setDefaultModel] = useState(initial?.default_model || '');
   const [showKey, setShowKey] = useState(false);
 
-  // Current strategy based on apiType
-  const strategy = apiType === 'lmstudio' ? strategies.lmstudio : strategies.openai;
+  // Current strategy based on apiType (stable reference)
+  const strategy = useMemo(
+    () => (apiType === 'lmstudio' ? strategies.lmstudio : strategies.openai),
+    [apiType],
+  );
 
   // Model auto-fetch state
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [modelFetchError, setModelFetchError] = useState<string | null>(null);
   const [fetchedAtStartup, setFetchedAtStartup] = useState(false);
-  const [selectedModelInfo, setSelectedModelInfo] = useState<ModelInfo | null>(null);
   const [modelObjectsMap, setModelObjectsMap] = useState<Record<string, unknown>>({});
 
-  // Manual overrides for optional model info fields
-  const [overrideMaxContext, setOverrideMaxContext] = useState<string>(
-    initial?.model_info?.max_context_length?.toString() ?? ''
-  );
-
-  // Build final model_info: auto-fetched values merged with manual overrides
-  const builtModelInfo: ModelInfo | null = selectedModelInfo
-    ? {
-        ...selectedModelInfo,
-        max_context_length: overrideMaxContext
-          ? Number(overrideMaxContext)
-          : selectedModelInfo.max_context_length,
-      }
-    : null;
-
-  // Extract model info when model selection changes (from already-fetched data)
-  useEffect(() => {
-    if (!defaultModel || !strategy) return;
-    const modelObj = modelObjectsMap[defaultModel] as Record<string, unknown> | undefined;
-    if (modelObj) {
-      setSelectedModelInfo(strategy.extractModelInfo(modelObj));
-    } else {
-      setSelectedModelInfo(null);
-    }
-  }, [defaultModel, modelObjectsMap, strategy]);
+  // Per-model overrides: { [modelKey]: { max_context?: number } }
+  const [modelOverrides, setModelOverrides] = useState<Record<string, { max_context?: number }>>({});
+  // Which fetched models are enabled (default all true)
+  const [modelEnabled, setModelEnabled] = useState<Record<string, boolean>>({});
+  // Whether the fetched model list panel is expanded
+  const [modelsListExpanded, setModelsListExpanded] = useState(false);
 
   const getBaseUrl = (url: string) => {
     try {
@@ -116,6 +99,23 @@ function ProviderForm({
 
       setModelObjectsMap(modelObjects);
       setAvailableModels(models);
+      // Preserve existing enabled state for models that still exist; enable new ones by default
+      setModelEnabled((prev) => {
+        const next: Record<string, boolean> = {};
+        models.forEach((m) => {
+          if (prev[m] !== undefined) next[m] = prev[m];
+          else next[m] = true;
+        });
+        return next;
+      });
+      // Preserve existing overrides for models that still exist; clear for removed ones
+      setModelOverrides((prev) => {
+        const next: Record<string, { max_context?: number }> = {};
+        models.forEach((m) => {
+          if (prev[m]) next[m] = prev[m];
+        });
+        return next;
+      });
       if (models.length > 0 && !defaultModel) {
         setDefaultModel(models[0]);
       }
@@ -131,17 +131,20 @@ function ProviderForm({
 
   // Auto-fetch models when URL or API key changes
   useEffect(() => {
+    // For existing providers, skip auto-fetch — models are restored from initial.models
+    // For new providers, allow auto-fetch when user changes URL/API key
+    if (isEditing) return;
     if (!fetchedAtStartup) return;
     if (!apiUrl) { setAvailableModels([]); return; }
     fetchModels(apiUrl, apiKey);
-  }, [apiUrl, apiKey, apiType, fetchModels, fetchedAtStartup]);
+  }, [apiUrl, apiKey, apiType, fetchModels, fetchedAtStartup, isEditing]);
 
   // Detect when user starts editing an existing provider
   useEffect(() => {
     if (!initial) return;
     setFetchedAtStartup(false);
     const check = setTimeout(() => {
-      if (name !== initial.name || apiUrl !== initial.api_url || apiType !== initial.api_type || endpoint !== initial.endpoint) {
+      if (apiUrl !== initial.api_url || apiType !== initial.api_type || endpoint !== initial.endpoint) {
         setFetchedAtStartup(true);
         setDefaultModel('');
         setAvailableModels([]);
@@ -149,7 +152,7 @@ function ProviderForm({
       }
     }, 100);
     return () => clearTimeout(check);
-  }, [initial, name, apiUrl, apiType, endpoint]);
+  }, [initial, apiUrl, apiType, endpoint]);
 
   // Initial fetch when loading an existing provider
   useEffect(() => {
@@ -162,16 +165,10 @@ function ProviderForm({
     }
   }, [initial, apiUrl, apiKey, fetchModels, fetchedAtStartup]);
 
-  // Reset overrides when model selection changes
-  useEffect(() => {
-    if (!defaultModel) {
-      setOverrideMaxContext('');
-    }
-  }, [defaultModel]);
-
   // Restore models when editing an existing provider with models
   useEffect(() => {
     if (!initial?.models || initial.models.length === 0) return;
+
     const keys = initial.models.map((m) => m.key);
     setAvailableModels(keys);
     // Rebuild modelObjectsMap from initial models
@@ -180,6 +177,17 @@ function ProviderForm({
       map[m.key] = { key: m.key, display_name: m.display_name, model_info: m.model_info };
     });
     setModelObjectsMap(map);
+    // Restore enabled state and per-model overrides
+    const enabled: Record<string, boolean> = {};
+    const overrides: Record<string, { max_context?: number }> = {};
+    initial.models.forEach((m) => {
+      enabled[m.key] = m.enabled !== false;
+      if (m.model_info?.max_context_length !== undefined) {
+        overrides[m.key] = { max_context: m.model_info.max_context_length };
+      }
+    });
+    setModelEnabled(enabled);
+    setModelOverrides(overrides);
     if (initial.default_model && keys.includes(initial.default_model)) {
       setDefaultModel(initial.default_model);
     }
@@ -194,20 +202,13 @@ function ProviderForm({
       setAvailableModels([]);
       setModelObjectsMap({});
       setModelFetchError(null);
-      setOverrideMaxContext('');
+      setModelOverrides({});
+      setModelEnabled({});
     }
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
-    if (isEditing) {
-      setFetchedAtStartup(false);
-      setDefaultModel('');
-      setAvailableModels([]);
-      setModelObjectsMap({});
-      setModelFetchError(null);
-      setOverrideMaxContext('');
-    }
   };
 
   const handleApiTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -225,7 +226,8 @@ function ProviderForm({
       setAvailableModels([]);
       setModelObjectsMap({});
       setModelFetchError(null);
-      setOverrideMaxContext('');
+      setModelOverrides({});
+      setModelEnabled({});
     }
   };
 
@@ -237,7 +239,8 @@ function ProviderForm({
       setAvailableModels([]);
       setModelObjectsMap({});
       setModelFetchError(null);
-      setOverrideMaxContext('');
+      setModelOverrides({});
+      setModelEnabled({});
     }
   };
 
@@ -245,31 +248,78 @@ function ProviderForm({
     setDefaultModel(e.target.value);
     setAvailableModels([]);
     setModelObjectsMap({});
-    setOverrideMaxContext('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Build models list from fetched data
-    const modelsList: { key: string; display_name?: string; model_info?: ModelInfo }[] =
-      availableModels.map((key) => {
-        const obj = modelObjectsMap[key] as Record<string, unknown> | undefined;
-        const info = obj ? strategy?.extractModelInfo(obj) : null;
-        return {
-          key,
-          display_name: info?.display_name || key,
-          model_info: info || undefined,
-        };
-      });
+    // Build models list from fetched data — all models with their enabled state
+    const modelsList: { key: string; display_name?: string; model_info?: ModelInfo; enabled?: boolean }[] =
+      availableModels
+        .map((key) => {
+          const obj = modelObjectsMap[key] as Record<string, unknown> | undefined;
+          const info = obj ? strategy?.extractModelInfo(obj) : null;
+          const override = modelOverrides[key];
+          const isEnabled = modelEnabled[key] !== false;
+          const displayName = info?.display_name || key;
+
+          // Always include model_info if there's an override, even if API data is missing
+          if (override?.max_context !== undefined) {
+            return {
+              key,
+              display_name: displayName,
+              model_info: {
+                key,
+                display_name: displayName,
+                max_context_length: override.max_context,
+              },
+              enabled: isEnabled,
+            };
+          }
+
+          if (info) {
+            return {
+              key,
+              display_name: displayName,
+              model_info: {
+                ...info,
+                max_context_length: info.max_context_length,
+              },
+              enabled: isEnabled,
+            };
+          }
+
+          return { key, display_name: displayName, enabled: isEnabled };
+        });
 
     // Add manually-typed model if not already in the list
     if (defaultModel && !modelsList.some((m) => m.key === defaultModel)) {
-      modelsList.unshift({
-        key: defaultModel,
-        display_name: defaultModel,
-        model_info: builtModelInfo || undefined,
-      });
+      const override = modelOverrides[defaultModel];
+      const obj = modelObjectsMap[defaultModel] as Record<string, unknown> | undefined;
+      const info = obj ? strategy?.extractModelInfo(obj) : null;
+      const displayName = info?.display_name || defaultModel;
+
+      if (override?.max_context !== undefined) {
+        modelsList.unshift({
+          key: defaultModel,
+          display_name: displayName,
+          model_info: {
+            key: defaultModel,
+            display_name: displayName,
+            max_context_length: override.max_context,
+          },
+          enabled: true,
+        });
+      } else if (info) {
+        modelsList.unshift({
+          key: defaultModel,
+          display_name: displayName,
+          model_info: { ...info, max_context_length: info.max_context_length },
+          enabled: true,
+        });
+      } else {
+        modelsList.unshift({ key: defaultModel, display_name: displayName, enabled: true });
+      }
     }
 
     onSave({
@@ -279,7 +329,7 @@ function ProviderForm({
       api_type: apiType,
       endpoint,
       default_model: defaultModel,
-      model_info: builtModelInfo,
+      model_info: null,
       models: modelsList,
     });
   };
@@ -369,82 +419,152 @@ function ProviderForm({
 
       <div>
         <label className="block text-xs text-gray-400 mb-1">Default Model</label>
-        {availableModels.length > 0 ? (
-          <select
-            value={defaultModel}
-            onChange={(e) => setDefaultModel(e.target.value)}
-            className="w-full px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-primary focus:outline-none focus:border-gray-500 bg-theme-input"
-            required
-          >
-            {availableModels.map((model) => (
-              <option key={model} value={model}>{model}</option>
-            ))}
-          </select>
-        ) : (
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          {availableModels.length > 0 ? (
             <input
               type="text"
               value={defaultModel}
               onChange={handleManualModelChange}
-              placeholder="Select or type a model"
-              className="flex-1 px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-primary focus:outline-none focus:border-gray-500"
-              list="models-datalist"
-              required
+              placeholder="Auto-selected from fetched models"
+              className="flex-1 px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-primary focus:outline-none focus:border-gray-500 bg-theme-input"
+              readOnly
             />
-            <button
-              type="button"
-              onClick={() => fetchModels(apiUrl, apiKey)}
-              disabled={isFetchingModels || !apiUrl}
-              className="px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-secondary hover-theme-text-primary transition-colors disabled:opacity-50 whitespace-nowrap flex items-center gap-1.5"
-              title="Fetch available models from provider"
-            >
-              {isFetchingModels ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Plus className="w-3.5 h-3.5" />
-              )}
-              {isFetchingModels ? 'Fetching...' : 'Fetch'}
-            </button>
-          </div>
-        )}
-        <datalist id="models-datalist">
-          {availableModels.map((model) => (
-            <option key={model} value={model} />
-          ))}
-        </datalist>
+          ) : (
+            <input
+              type="text"
+              value={defaultModel}
+              onChange={handleManualModelChange}
+              placeholder="Type a model name"
+              className="flex-1 px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-primary focus:outline-none focus:border-gray-500"
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => fetchModels(apiUrl, apiKey)}
+            disabled={isFetchingModels || !apiUrl}
+            className="px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-secondary hover-theme-text-primary transition-colors disabled:opacity-50 whitespace-nowrap flex items-center gap-1.5"
+            title="Fetch available models from provider"
+          >
+            {isFetchingModels ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5" />
+            )}
+            {isFetchingModels ? 'Fetching...' : 'Fetch'}
+          </button>
+        </div>
         {modelFetchError && (
           <p className="text-xs text-red-400 mt-1">Could not fetch models: {modelFetchError}. Type a model name manually.</p>
         )}
         {availableModels.length === 0 && !isFetchingModels && !modelFetchError && !defaultModel && (
           <p className="text-xs text-gray-500 mt-1">Click "Fetch" to load available models, or type a model name manually.</p>
         )}
-        {selectedModelInfo && (
-          <div className="mt-2 p-2 bg-gray-800/50 rounded text-xs space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 w-20">Model:</span>
-              <span className="theme-text-primary">{selectedModelInfo.display_name}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 w-20">Max context:</span>
-              <input
-                type="number"
-                value={overrideMaxContext || (selectedModelInfo.max_context_length?.toString() ?? '')}
-                onChange={(e) => setOverrideMaxContext(e.target.value)}
-                placeholder="auto-detected"
-                className="w-28 px-2 py-0.5 theme-input border theme-border-light rounded text-xs theme-text-primary focus:outline-none focus:border-gray-500"
-              />
-              <span className="text-gray-600">tokens</span>
-            </div>
-            {selectedModelInfo.capabilities && (
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500 w-20">Caps:</span>
-                <span className="theme-text-primary">
-                  {[
-                    selectedModelInfo.capabilities.vision && 'vision',
-                    selectedModelInfo.capabilities.trained_for_tool_use && 'tools',
-                    selectedModelInfo.capabilities.reasoning && 'reasoning',
-                  ].filter(Boolean).join(', ') || 'basic'}
-                </span>
+
+        {/* Fetched models list */}
+        {availableModels.length > 0 && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setModelsListExpanded(!modelsListExpanded)}
+              className="text-xs theme-text-secondary hover-theme-text-primary flex items-center gap-1 transition-colors"
+            >
+              {modelsListExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              {availableModels.length} model{availableModels.length !== 1 ? 's' : ''} fetched
+              <span className="theme-text-muted">
+                ({availableModels.filter((m) => modelEnabled[m] !== false).length} enabled)
+              </span>
+            </button>
+
+            {modelsListExpanded && (
+              <div className="mt-2 space-y-2 max-h-80 overflow-y-auto pr-1">
+                {availableModels.map((modelKey) => {
+                  const modelObj = modelObjectsMap[modelKey] as Record<string, unknown> | undefined;
+                  const info = modelObj ? strategy?.extractModelInfo(modelObj) : null;
+                  const override = modelOverrides[modelKey];
+                  const isEnabled = modelEnabled[modelKey] !== false;
+                  const isDefault = modelKey === defaultModel;
+
+                  return (
+                    <div
+                      key={modelKey}
+                      className={`border rounded-lg p-2.5 transition-colors ${
+                        isDefault
+                          ? 'border-[var(--accent)]/50 bg-[var(--accent)]/5'
+                          : 'border-gray-700 bg-gray-900/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {/* Default model heart */}
+                        <button
+                          type="button"
+                          onClick={() => setDefaultModel(modelKey)}
+                          disabled={!isEnabled}
+                          className={`flex items-center justify-center flex-shrink-0 transition-colors ${
+                            isEnabled ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-40'
+                          }`}
+                          title="Set as default model"
+                        >
+                          {isDefault ? (
+                            <Heart className="w-4 h-4 text-[var(--accent)] fill-[var(--accent)]" />
+                          ) : (
+                            <Heart className="w-4 h-4 theme-text-muted" />
+                          )}
+                        </button>
+                        {/* Enable/disable checkbox */}
+                        <button
+                          type="button"
+                          onClick={() => setModelEnabled((prev) => ({
+                            ...prev,
+                            [modelKey]: !isEnabled,
+                          }))}
+                          className={`w-4 h-4 rounded flex items-center justify-center border transition-colors flex-shrink-0 ${
+                            isEnabled
+                              ? 'border-[var(--accent)] bg-[var(--accent)]'
+                              : 'border-gray-600 hover:border-gray-500'
+                          }`}
+                        >
+                          {isEnabled && <Check className="w-3 h-3 text-white" />}
+                        </button>
+                        <span className={`text-xs font-mono flex-1 truncate ${isEnabled ? 'theme-text-primary' : 'theme-text-muted line-through'}`}>
+                          {modelKey}
+                        </span>
+                      </div>
+
+                      {isEnabled && (
+                        <div className="mt-2 ml-6 flex flex-wrap gap-3">
+                          <div className="flex items-center gap-1.5">
+                            <label className="text-[10px] text-gray-500 w-16 flex-shrink-0">Max ctx:</label>
+                            <input
+                              type="number"
+                              value={override?.max_context ?? (info?.max_context_length ?? '')}
+                              onChange={(e) => {
+                                const val = e.target.value ? Number(e.target.value) : undefined;
+                                setModelOverrides((prev) => ({
+                                  ...prev,
+                                  [modelKey]: { ...prev[modelKey], max_context: val },
+                                }));
+                              }}
+                              placeholder="auto"
+                              className="w-24 px-1.5 py-0.5 theme-input border theme-border-light rounded text-xs theme-text-primary focus:outline-none focus:border-gray-500"
+                            />
+                          </div>
+                          {info?.capabilities && (
+                            <div className="flex items-center gap-1">
+                              <label className="text-[10px] text-gray-500 w-16 flex-shrink-0">Caps:</label>
+                              <span className="text-[10px] theme-text-secondary">
+                                {[
+                                  info.capabilities.vision && 'vision',
+                                  info.capabilities.trained_for_tool_use && 'tools',
+                                  info.capabilities.reasoning && 'reasoning',
+                                ].filter(Boolean).join(', ') || 'basic'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -713,7 +833,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
 
         <div className="pt-4 mt-6 border-t theme-border">
           <p className="text-xs theme-text-muted">
-            Chat App v1.0.0 — A claude.ai-inspired desktop client
+            Chat App v{import.meta.env.PACKAGE_VERSION || '1.0.0'} — Local first LLM desktop client
           </p>
         </div>
       </div>

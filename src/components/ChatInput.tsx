@@ -34,8 +34,10 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Get available models for the active provider
-  const availableModels = activeProvider?.models ?? [];
+  // Get available models for the active provider (exclude disabled)
+  const availableModels = (activeProvider?.models ?? []).filter(
+    (m) => m.enabled !== false
+  );
   const displayModelName = useCallback(() => {
     if (!activeProvider) return '';
     // Prefer stored selection, then default_model, then first in list
@@ -150,7 +152,7 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
 
   return (
     <div className="border-t theme-border theme-main">
-      <div className="max-w-chat-input-max mx-auto px-4 py-3">
+      <div className="max-w-3xl mx-auto px-4 py-3">
         {/* Token stats (right-aligned, above input) */}
         {maxTokens && (
           <div className={`text-xs font-mono flex items-center justify-center gap-3 mb-2 ${
