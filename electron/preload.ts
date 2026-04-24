@@ -64,6 +64,8 @@ const chatApi = {
       ipcRenderer.invoke('messages:add', conversationId, role, content, model, reasoning) as Promise<Message>,
     delete: (conversationId: string) =>
       ipcRenderer.invoke('messages:delete', conversationId),
+    deleteOne: (id: string) =>
+      ipcRenderer.invoke('messages:deleteOne', id),
   },
   providers: {
     list: () => ipcRenderer.invoke('providers:list') as Promise<Provider[]>,

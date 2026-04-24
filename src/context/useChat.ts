@@ -72,8 +72,97 @@ function buildRequestBody(
   }
 }
 
+async function generateTitle(
+  provider: Provider,
+  model: string,
+  userMessage: string,
+  assistantMessage: string
+): Promise<string | null> {
+  const prompt = `Summarize the following chat in 3-6 words as a short title. Respond with only the title — no quotes, no trailing punctuation.\n\nUser: ${userMessage.slice(0, 500)}\nAssistant: ${assistantMessage.slice(0, 500)}`;
+  const kind = getApiKind(provider);
+  const chatUrl = getFullChatUrl(provider);
+
+  let body: Record<string, unknown>;
+  switch (kind) {
+    case 'lmstudio-chat':
+    case 'lmstudio-responses':
+      body = { model, input: prompt, stream: false };
+      break;
+    case 'lmstudio-messages':
+      body = {
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        stream: false,
+      };
+      break;
+    default:
+      body = {
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        stream: false,
+      };
+  }
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (provider.api_type === 'openai') {
+    headers.Authorization = `Bearer ${provider.api_key}`;
+  } else if (provider.endpoint === '/v1/messages') {
+    headers['x-api-key'] = provider.api_key;
+    headers['anthropic-version'] = '2023-06-01';
+  } else if (provider.api_key) {
+    headers.Authorization = `Bearer ${provider.api_key}`;
+  }
+
+  try {
+    const res = await fetch(chatUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    const raw =
+      // OpenAI chat completions
+      data?.choices?.[0]?.message?.content ??
+      // LM Studio Responses API
+      (Array.isArray(data?.output)
+        ? data.output
+            .filter((o: { type?: string }) => o.type === 'message')
+            .map((o: { content?: unknown }) => {
+              if (typeof o.content === 'string') return o.content;
+              if (Array.isArray(o.content)) {
+                return o.content
+                  .map((c: { text?: string }) => c.text ?? '')
+                  .join('');
+              }
+              return '';
+            })
+            .join('')
+        : null) ??
+      data?.output_text ??
+      // Anthropic Messages API
+      (Array.isArray(data?.content)
+        ? data.content
+            .map((c: { text?: string }) => c.text ?? '')
+            .join('')
+        : null) ??
+      null;
+
+    if (typeof raw !== 'string') return null;
+    const cleaned = raw
+      .replace(/^["'“”‘’\s]+|["'“”‘’\s.,!?]+$/g, '')
+      .split('\n')[0]
+      .trim();
+    if (!cleaned) return null;
+    return cleaned.slice(0, 60);
+  } catch {
+    return null;
+  }
+}
+
 export function useChat() {
-  const { messages, activeConversationId, addMessage, chatSettings } = useApp();
+  const { messages, activeConversationId, addMessage, deleteMessage, chatSettings, updateConversationTitle } = useApp();
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingReasoningContent, setStreamingReasoningContent] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -133,7 +222,6 @@ export function useChat() {
       setIsStreaming(true);
       setStreamingContent('');
       setStreamingReasoningContent('');
-      setLoadingPhase({ kind: 'idle' });
 
       let accumulatedContent = '';
       let accumulatedReasoningContent = '';
@@ -385,6 +473,9 @@ export function useChat() {
       }
 
       if (accumulatedContent) {
+        const isFirstAssistant = !messagesRef.current.some((m) => m.role === 'assistant');
+        const firstUserMsg = messagesRef.current.find((m) => m.role === 'user')?.content ?? '';
+
         await addMessage(
           convId,
           'assistant',
@@ -395,7 +486,13 @@ export function useChat() {
           finalStats?.total_output_tokens,
           finalStats?.reasoning_output_tokens
         );
-        if (finalStats) setTokenStats(finalStats);
+
+        if (isFirstAssistant) {
+          const title = await generateTitle(provider, usedModel, firstUserMsg, accumulatedContent);
+          if (title) {
+            await updateConversationTitle(convId, title);
+          }
+        }
       }
 
       setStreamingContent('');
@@ -403,7 +500,7 @@ export function useChat() {
       setIsStreaming(false);
       setLoadingPhase({ kind: 'idle' });
     },
-    [activeConversationId, isStreaming, addMessage, chatSettings.system_prompt]
+    [activeConversationId, isStreaming, addMessage, chatSettings.system_prompt, updateConversationTitle]
   );
 
   const stop = useCallback(() => {
@@ -412,6 +509,44 @@ export function useChat() {
     setIsStreaming(false);
     setLoadingPhase({ kind: 'idle' });
   }, []);
+
+  const regenerate = useCallback(
+    async (provider: Provider, model?: string) => {
+      const convId = activeConversationId;
+      if (!convId || isStreaming) return;
+
+      const msgs = messagesRef.current;
+      let lastAssistantIdx = -1;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === 'assistant') {
+          lastAssistantIdx = i;
+          break;
+        }
+      }
+      if (lastAssistantIdx === -1) return;
+
+      // The user message immediately before the last assistant
+      let lastUserIdx = -1;
+      for (let i = lastAssistantIdx - 1; i >= 0; i--) {
+        if (msgs[i].role === 'user') {
+          lastUserIdx = i;
+          break;
+        }
+      }
+      if (lastUserIdx === -1) return;
+
+      const userContent = msgs[lastUserIdx].content;
+      // Drop the prior response_id so we don't pin the regenerated reply to the
+      // same server-side KV cache chain.
+      delete responseIdRef.current[convId];
+
+      await deleteMessage(msgs[lastAssistantIdx].id);
+      await deleteMessage(msgs[lastUserIdx].id);
+
+      await send(userContent, provider, model, convId);
+    },
+    [activeConversationId, isStreaming, deleteMessage, send]
+  );
 
   return {
     streamingContent,
@@ -422,5 +557,6 @@ export function useChat() {
     scrollRef,
     send,
     stop,
+    regenerate,
   };
 }

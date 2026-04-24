@@ -87,6 +87,13 @@ const chatApi = {
       db.messages[conversationId] = [];
       saveDB(db);
     },
+    async deleteOne(id: string) {
+      const db = loadDB();
+      for (const convId of Object.keys(db.messages)) {
+        db.messages[convId] = db.messages[convId].filter((m: { id: string }) => m.id !== id);
+      }
+      saveDB(db);
+    },
   },
   providers: {
     async list() {
@@ -124,5 +131,4 @@ const chatApi = {
 };
 
 window.chatApi = chatApi;
-console.log('[mock] window.chatApi injected');
 }

@@ -274,6 +274,11 @@ ipcMain.handle('messages:delete', (_e, conversationId: string) => {
   saveDb();
 });
 
+ipcMain.handle('messages:deleteOne', (_e, id: string) => {
+  run('DELETE FROM messages WHERE id = ?', [id]);
+  saveDb();
+});
+
 // ─── Providers ───────────────────────────────────────────────
 
 ipcMain.handle('providers:list', () => {

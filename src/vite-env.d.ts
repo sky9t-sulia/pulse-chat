@@ -67,6 +67,7 @@ interface ChatAPI {
       reasoningTokens?: number
     ) => Promise<Message>;
     delete: (conversationId: string) => Promise<void>;
+    deleteOne: (id: string) => Promise<void>;
   };
   providers: {
     list: () => Promise<Provider[]>;

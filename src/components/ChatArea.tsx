@@ -5,7 +5,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
-import { StopCircle, Loader2, ChevronDown, ChevronUp, Plus, MessageSquare } from 'lucide-react';
+import { StopCircle, Loader2, ChevronDown, ChevronUp, Plus, MessageSquare, RotateCcw } from 'lucide-react';
 import type { Message } from '../types';
 import type { LoadingPhase } from '../context/useChat';
 
@@ -16,6 +16,7 @@ interface Props {
   loadingPhase: LoadingPhase;
   onStop: () => void;
   scrollRef: React.Ref<HTMLDivElement>;
+  onRegenerate?: () => void;
 }
 
 function CopyButton({ code }: { code: string }) {
@@ -263,7 +264,7 @@ function MessageBubble({ message }: { message: Message }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
       <div
-        className={`chat-content chat-text ${
+        className={`chat-content ${
           isUser
             ? 'theme-input px-4 py-2.5 rounded-2xl rounded-br-md'
             : ''
@@ -304,7 +305,7 @@ function LoadingIndicator({ phase }: { phase: LoadingPhase }) {
   );
 }
 
-export default function ChatArea({ streamingContent, streamingReasoningContent, isStreaming, loadingPhase, onStop, scrollRef }: Props) {
+export default function ChatArea({ streamingContent, streamingReasoningContent, isStreaming, loadingPhase, onStop, scrollRef, onRegenerate }: Props) {
   const {
     activeConversationId,
     messages,
@@ -398,9 +399,24 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
             <MessageBubble key={msg.id} message={msg} />
           ))}
 
+          {!isStreaming &&
+            onRegenerate &&
+            messages.length > 0 &&
+            messages[messages.length - 1].role === 'assistant' && (
+              <div className="flex justify-start mb-6 -mt-4">
+                <button
+                  onClick={onRegenerate}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs theme-text-secondary hover-theme-text-primary theme-sidebar-hover border theme-border rounded-full transition-all"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Regenerate
+                </button>
+              </div>
+            )}
+
           {streamingReasoningContent && (
             <div className="flex justify-start mb-0">
-              <div className="chat-content chat-text max-w-[85%]">
+              <div className="chat-content max-w-[85%]">
                 <ReasoningBlock reasoning={streamingReasoningContent} isStreaming />
               </div>
             </div>
@@ -408,7 +424,7 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
 
           {streamingContent && (
             <div className="flex justify-start mb-4">
-              <div className="chat-content chat-text max-w-[85%]">
+              <div className="chat-content max-w-[85%]">
                 <MessageContent content={streamingContent} />
               </div>
             </div>

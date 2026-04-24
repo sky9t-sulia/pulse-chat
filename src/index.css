@@ -245,13 +245,6 @@ body {
   50% { opacity: 0; }
 }
 
-/* ─── Model selector dropdown ─────────────────────────────── */
-
-.model-selector {
-  position: relative;
-  display: inline-block;
-}
-
 /* ─── Settings modal ──────────────────────────────────────── */
 
 .modal-overlay {

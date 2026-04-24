@@ -7,7 +7,8 @@ import ChatInput from './components/ChatInput';
 import type { Provider } from './types';
 
 function ChatContainer() {
-  const { streamingContent, streamingReasoningContent, isStreaming, loadingPhase, tokenStats, scrollRef, send, stop } = useChat();
+  const { streamingContent, streamingReasoningContent, isStreaming, loadingPhase, tokenStats, scrollRef, send, stop, regenerate } = useChat();
+  const { activeProvider } = useApp();
   const sendRef = useRef(send);
 
   useEffect(() => {
@@ -38,6 +39,9 @@ function ChatContainer() {
         loadingPhase={loadingPhase}
         onStop={stop}
         scrollRef={scrollRef}
+        onRegenerate={
+          activeProvider ? () => regenerate(activeProvider) : undefined
+        }
       />
       <ChatInput onSend={send} tokenStats={tokenStats} />
     </div>

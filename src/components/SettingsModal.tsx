@@ -61,7 +61,7 @@ function ProviderForm({
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [modelFetchError, setModelFetchError] = useState<string | null>(null);
-  const [fetchedAtStartup, setFetchedAtStartup] = useState(initial ? false : false);
+  const [fetchedAtStartup, setFetchedAtStartup] = useState(false);
   const [selectedModelInfo, setSelectedModelInfo] = useState<ModelInfo | null>(null);
   const [modelObjectsMap, setModelObjectsMap] = useState<Record<string, unknown>>({});
 

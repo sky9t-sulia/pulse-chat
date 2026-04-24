@@ -85,6 +85,7 @@ interface AppContextType {
     reasoningTokens?: number
   ) => Promise<Message>;
   deleteMessages: (conversationId: string) => Promise<void>;
+  deleteMessage: (id: string) => Promise<void>;
   addProvider: (provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => Promise<Provider>;
   updateProvider: (id: string, provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   deleteProvider: (id: string) => Promise<void>;
@@ -243,6 +244,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMessages([]);
   }, []);
 
+  const deleteMessage = useCallback(async (id: string) => {
+    await window.chatApi.messages.deleteOne(id);
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+  }, []);
+
   const addProvider = useCallback(
     async (provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => {
       const newProvider = await window.chatApi.providers.create({
@@ -311,6 +317,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     updateConversationTitle,
     addMessage,
     deleteMessages,
+    deleteMessage,
     addProvider,
     updateProvider,
     deleteProvider,
