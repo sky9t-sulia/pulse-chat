@@ -40,7 +40,10 @@ interface AppContextType {
     role: 'user' | 'assistant',
     content: string,
     model?: string,
-    reasoning?: string
+    reasoning?: string,
+    inputTokens?: number,
+    outputTokens?: number,
+    reasoningTokens?: number
   ) => Promise<Message>;
   deleteMessages: (conversationId: string) => Promise<void>;
   addProvider: (provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => Promise<Provider>;
@@ -137,8 +140,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addMessage = useCallback(
-    async (conversationId: string, role: 'user' | 'assistant', content: string, model?: string, reasoning?: string) => {
-      const msg = await window.chatApi.messages.add(conversationId, role, content, model, reasoning);
+    async (
+      conversationId: string,
+      role: 'user' | 'assistant',
+      content: string,
+      model?: string,
+      reasoning?: string,
+      inputTokens?: number,
+      outputTokens?: number,
+      reasoningTokens?: number
+    ) => {
+      const msg = await window.chatApi.messages.add(
+        conversationId,
+        role,
+        content,
+        model,
+        reasoning,
+        inputTokens,
+        outputTokens,
+        reasoningTokens
+      );
       setMessages((prev) => [...prev, msg as Message]);
       return msg as Message;
     },
@@ -196,7 +217,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshMessages();
-  }, [refreshMessages]);
+  }, [activeConversationId]);
 
   const value: AppContextType = {
     conversations,

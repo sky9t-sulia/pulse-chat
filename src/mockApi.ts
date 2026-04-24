@@ -63,7 +63,7 @@ const chatApi = {
         (a, b) => new Date(a.created_at) - new Date(b.created_at)
       );
     },
-    async add(conversationId, role, content, model) {
+    async add(conversationId, role, content, model, reasoning, inputTokens, outputTokens, reasoningTokens) {
       const db = loadDB();
       if (!db.messages[conversationId]) db.messages[conversationId] = [];
       const msg = {
@@ -72,6 +72,10 @@ const chatApi = {
         role,
         content,
         model: model || 'gpt-4o',
+        reasoning,
+        input_tokens: inputTokens || 0,
+        output_tokens: outputTokens || 0,
+        reasoning_tokens: reasoningTokens || 0,
         created_at: new Date().toISOString(),
       };
       db.messages[conversationId].push(msg);

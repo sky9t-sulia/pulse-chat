@@ -56,7 +56,16 @@ interface ChatAPI {
   };
   messages: {
     get: (conversationId: string) => Promise<Message[]>;
-    add: (conversationId: string, role: string, content: string, model?: string, reasoning?: string) => Promise<Message>;
+    add: (
+      conversationId: string,
+      role: string,
+      content: string,
+      model?: string,
+      reasoning?: string,
+      inputTokens?: number,
+      outputTokens?: number,
+      reasoningTokens?: number
+    ) => Promise<Message>;
     delete: (conversationId: string) => Promise<void>;
   };
   providers: {

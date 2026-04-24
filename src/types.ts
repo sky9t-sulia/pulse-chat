@@ -13,6 +13,9 @@ export interface Message {
   reasoning?: string;
   created_at: number;
   model?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  reasoning_tokens?: number;
 }
 
 export interface ProviderModel {

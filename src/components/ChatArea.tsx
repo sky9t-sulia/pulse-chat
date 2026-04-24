@@ -45,23 +45,31 @@ function CodeBlock({
   language?: string;
   code: string;
 }) {
-  const theme = document.documentElement.classList.contains('light') ? oneLight : oneDark;
+  const { theme: appTheme } = useApp();
+  const baseTheme = appTheme === 'light' ? oneLight : oneDark;
+
+  // Strip the theme's hardcoded background so CSS handles it
+  const strippedTheme = { ...baseTheme };
+  for (const key of Object.keys(strippedTheme)) {
+    if (typeof strippedTheme[key] === 'object' && strippedTheme[key] !== null && 'background' in strippedTheme[key]) {
+      strippedTheme[key] = { ...strippedTheme[key], background: undefined };
+    }
+  }
 
   return (
-    <div className="code-block-wrapper">
+    <div className="code-block-wrapper my-4 rounded-lg border theme-border overflow-hidden">
       <div className="code-block-header">
         <span>{language || 'text'}</span>
         <CopyButton code={code} />
       </div>
       <SyntaxHighlighter
-        style={theme}
+        style={strippedTheme}
         language={language || 'text'}
         PreTag="div"
         customStyle={{
           margin: 0,
           borderRadius: '0 0 8px 8px',
           padding: '12px 16px',
-          background: 'transparent',
         }}
       >
         {code}
@@ -91,6 +99,125 @@ function MessageContent({ content }: { content: string }) {
           }
 
           return <CodeBlock language={match[1]} code={codeStr} />;
+        },
+        table({ children }) {
+          return (
+            <div className="my-4 overflow-x-auto">
+              <table className="min-w-full border-collapse border theme-border text-sm">
+                {children}
+              </table>
+            </div>
+          );
+        },
+        thead({ children }) {
+          return <thead>{children}</thead>;
+        },
+        th({ children, ...props }) {
+          return (
+            <th
+              className="border theme-border px-4 py-2 text-left font-semibold"
+              {...props}
+            >
+              {children}
+            </th>
+          );
+        },
+        td({ children, ...props }) {
+          return (
+            <td
+              className="border theme-border px-4 py-2"
+              {...props}
+            >
+              {children}
+            </td>
+          );
+        },
+        tr({ children, ...props }) {
+          return <tr {...props}>{children}</tr>;
+        },
+        h1({ children, ...props }) {
+          return (
+            <h1 className="text-2xl font-bold mt-6 mb-3 pb-2 border-b theme-border" {...props}>
+              {children}
+            </h1>
+          );
+        },
+        h2({ children, ...props }) {
+          return (
+            <h2 className="text-xl font-semibold mt-5 mb-2 pb-1.5 border-b theme-border" {...props}>
+              {children}
+            </h2>
+          );
+        },
+        h3({ children, ...props }) {
+          return (
+            <h3 className="text-lg font-semibold mt-4 mb-1.5" {...props}>
+              {children}
+            </h3>
+          );
+        },
+        h4({ children, ...props }) {
+          return (
+            <h4 className="text-base font-semibold mt-3 mb-1" {...props}>
+              {children}
+            </h4>
+          );
+        },
+        blockquote({ children, ...props }) {
+          return (
+            <blockquote
+              className="blockquote-content pl-4 my-4 theme-text-secondary italic"
+              {...props}
+            >
+              {children}
+            </blockquote>
+          );
+        },
+        ul({ children, ...props }) {
+          return (
+            <ul className="list-disc pl-6 my-3 space-y-1" {...props}>
+              {children}
+            </ul>
+          );
+        },
+        ol({ children, ...props }) {
+          return (
+            <ol className="list-decimal pl-6 my-3 space-y-1" {...props}>
+              {children}
+            </ol>
+          );
+        },
+        li({ children, ...props }) {
+          return <li className="pl-1" {...props}>{children}</li>;
+        },
+        hr({ ...props }) {
+          return <hr className="my-6 border-t theme-border" {...props} />;
+        },
+        strong({ children, ...props }) {
+          return <strong className="font-semibold" {...props}>{children}</strong>;
+        },
+        a({ children, ...props }) {
+          return (
+            <a
+              className="text-blue-400 hover:text-blue-300 underline"
+              target="_blank"
+              rel="noopener noreferrer"
+              {...props}
+            >
+              {children}
+            </a>
+          );
+        },
+        img({ ...props }) {
+          return (
+            <img
+              className="max-w-full rounded-lg my-4 shadow-sm"
+              {...props}
+            />
+          );
+        },
+        del({ children, ...props }) {
+          return <del className="line-through theme-text-muted" {...props}>{children}</del>;
         },
       }}
     >
@@ -233,8 +360,8 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-20 py-6">
+    <div className="flex-1 flex flex-col h-full min-h-0">
+      <div className="flex-1 overflow-y-auto scroll-smooth min-h-0 px-4 sm:px-6 lg:px-20 py-6">
         <div className="max-w-chat-max mx-auto">
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />

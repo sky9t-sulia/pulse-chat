@@ -133,7 +133,7 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
   const inputTokens = tokenStats?.input_tokens ?? 0;
   const outputTokens = tokenStats?.total_output_tokens ?? 0;
   const reasoningTokens = tokenStats?.reasoning_output_tokens ?? 0;
-  const usedTokens = inputTokens;
+  const usedTokens = inputTokens + outputTokens;
   const remainingTokens = maxTokens ? Math.max(0, maxTokens - usedTokens) : null;
 
   if (!activeProvider) {
@@ -238,9 +238,11 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
                 : 'text-gray-500'
             }`}>
               <div>
-                {usedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens used
+                {usedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens
                 {remainingTokens !== null && (
-                  <span className="theme-text-muted ml-1">({remainingTokens.toLocaleString()} left)</span>
+                  <span className="theme-text-muted ml-1">
+                    ({(remainingTokens / maxTokens * 100).toFixed(1)}% left)
+                  </span>
                 )}
               </div>
               <div className="theme-text-muted">

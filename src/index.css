@@ -20,6 +20,14 @@
   --text-tertiary: #666;
   --text-heading: #f0f0f0;
   --text-muted: #6b7280;
+  --scrollbar-thumb: #333;
+  --scrollbar-thumb-hover: #555;
+  --copy-btn-bg: #333;
+  --copy-btn-text: #ccc;
+  --copy-btn-hover-bg: #d0d0d0;
+  --copy-btn-hover-text: #333;
+  --modal-bg: #1e1e1e;
+  --modal-bg-light: #ffffff;
 }
 
 .light {
@@ -37,6 +45,14 @@
   --text-tertiary: #888;
   --text-heading: #111827;
   --text-muted: #6b7280;
+  --scrollbar-thumb: #ccc;
+  --scrollbar-thumb-hover: #999;
+  --copy-btn-bg: #333;
+  --copy-btn-text: #ccc;
+  --copy-btn-hover-bg: #d0d0d0;
+  --copy-btn-hover-text: #333;
+  --modal-bg: #1e1e1e;
+  --modal-bg-light: #ffffff;
 }
 
 body {
@@ -61,22 +77,22 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #333;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* ─── Light theme scrollbar ───────────────────────────────── */
 
 .light ::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--scrollbar-thumb);
 }
 
 .light ::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* ─── Chat message area ───────────────────────────────────── */
@@ -88,14 +104,19 @@ body {
 
 .chat-content p {
   margin-bottom: 0.75em;
+  line-height: 1.7;
 }
 
 .chat-content p:last-child {
   margin-bottom: 0;
 }
 
+.chat-content p + p {
+  margin-top: 0.25em;
+}
+
 .chat-content pre {
-  background: #0d0d0d;
+  background: var(--bg-sidebar);
   border-radius: 8px;
   padding: 12px 16px;
   overflow-x: auto;
@@ -109,25 +130,50 @@ body {
 }
 
 .chat-content :not(pre) code {
-  background: #2a2a2a;
+  background: var(--bg-sidebar-active);
   padding: 2px 6px;
   border-radius: 4px;
-  color: #e0e0e0;
+  color: var(--text-primary);
 }
 
-.light .chat-content pre {
-  background: #f5f5f5;
+/* Override SyntaxHighlighter theme backgrounds — the theme injects a <style> tag
+   with rules like code[class*="language-"] { background: ... } that we need to
+   neutralize so the wrapper's CSS background shows through. */
+.chat-content code[class*='language-'],
+.chat-content pre[class*='language-'],
+.chat-content .line,
+.chat-content .token.line {
+  background: transparent !important;
 }
 
-.light .chat-content :not(pre) code {
-  background: #e8e8e8;
-  color: #333;
+/* ─── Blockquote ────────────────────────────────────────────── */
+
+.blockquote-content {
+  border-left: 4px solid var(--text-secondary);
+}
+
+/* ─── Tables ────────────────────────────────────────────────── */
+
+.chat-content table th {
+  background: var(--bg-sidebar-active);
+}
+
+.chat-content table td {
+  background: transparent;
+}
+
+/* ─── Task list checkboxes ──────────────────────────────────── */
+
+.chat-content input[type='checkbox'] {
+  margin-right: 6px;
+  accent-color: var(--text-secondary);
 }
 
 /* ─── Code block header ───────────────────────────────────── */
 
 .code-block-wrapper {
   position: relative;
+  background: var(--bg-sidebar);
 }
 
 .code-block-header {
@@ -135,16 +181,16 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 8px 16px;
-  background: #1a1a1a;
+  background: var(--bg-main-hover);
   border-radius: 8px 8px 0 0;
   font-size: 0.75rem;
-  color: #888;
+  color: var(--text-secondary);
   font-family: 'JetBrains Mono', Consolas, monospace;
 }
 
 .light .code-block-header {
-  background: #e8e8e8;
-  color: #666;
+  background: var(--bg-main-hover);
+  color: var(--text-secondary);
 }
 
 .code-block-wrapper pre {
@@ -157,7 +203,7 @@ body {
 .copy-button {
   background: transparent;
   border: none;
-  color: #888;
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 2px 8px;
   border-radius: 4px;
@@ -166,13 +212,13 @@ body {
 }
 
 .copy-button:hover {
-  background: #333;
-  color: #ccc;
+  background: var(--copy-btn-bg);
+  color: var(--copy-btn-text);
 }
 
 .light .copy-button:hover {
-  background: #d0d0d0;
-  color: #333;
+  background: var(--copy-btn-hover-bg);
+  color: var(--copy-btn-hover-text);
 }
 
 /* ─── Typing cursor animation ─────────────────────────────── */
@@ -202,7 +248,7 @@ body {
 }
 
 .modal-content {
-  background: #1e1e1e;
+  background: var(--modal-bg);
   border-radius: 12px;
   padding: 24px;
   min-width: 480px;
@@ -212,7 +258,7 @@ body {
 }
 
 .light .modal-content {
-  background: #ffffff;
+  background: var(--modal-bg-light);
 }
 
 /* ─── Input area ──────────────────────────────────────────── */
