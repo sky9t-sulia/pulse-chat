@@ -8,13 +8,11 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build:web": "tsc -p tsconfig.json && vite build",
-    "build:electron": "tsc -p tsconfig.electron.json",
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.electron.json && vite build",
-    "preview": "vite preview",
-    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && tsc -p tsconfig.electron.json && electron dist-electron/main.js\"",
-    "electron:build": "tsc -p tsconfig.json && tsc -p tsconfig.electron.json && vite build && electron-builder",
-    "build:release": "tsc -p tsconfig.json && tsc -p tsconfig.electron.json && vite build && electron-builder --linux AppImage",
+    "build:web": "tsc -p tsconfig.json && vite build",
+    "build:macos": "tsc -p tsconfig.json && tsc -p tsconfig.electron.json && vite build && electron-builder --mac",
+    "build:linux": "tsc -p tsconfig.json && tsc -p tsconfig.electron.json && vite build && electron-builder --linux",
+    "build:windows": "tsc -p tsconfig.json && tsc -p tsconfig.electron.json && vite build && electron-builder --win",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
