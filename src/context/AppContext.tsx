@@ -1,5 +1,42 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import type { Conversation, Message, Provider, ThemeMode } from '../types';
+import type { Conversation, Message, Provider, ThemeMode, ChatSettings, ChatFontFamily } from '../types';
+
+export const CHAT_FONT_STACKS: Record<ChatFontFamily, string> = {
+  system: `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`,
+  sans: `system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
+  serif: `Georgia, Cambria, 'Times New Roman', Times, serif`,
+  mono: `'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace`,
+  inter: `Inter, system-ui, -apple-system, sans-serif`,
+};
+
+export const CHAT_FONT_SIZE_STEPS = [12, 13, 14, 15, 16, 17, 18, 19, 20] as const;
+
+const DEFAULT_CHAT_SETTINGS: ChatSettings = {
+  system_prompt: '',
+  font_family: 'system',
+  font_size: 16,
+};
+
+function loadChatSettings(): ChatSettings {
+  try {
+    const raw = localStorage.getItem('chat-settings');
+    if (!raw) return DEFAULT_CHAT_SETTINGS;
+    const parsed = JSON.parse(raw);
+    return {
+      system_prompt: typeof parsed.system_prompt === 'string' ? parsed.system_prompt : '',
+      font_family: CHAT_FONT_STACKS[parsed.font_family as ChatFontFamily]
+        ? (parsed.font_family as ChatFontFamily)
+        : 'system',
+      font_size:
+        typeof parsed.font_size === 'number' &&
+        (CHAT_FONT_SIZE_STEPS as readonly number[]).includes(parsed.font_size)
+          ? parsed.font_size
+          : 16,
+    };
+  } catch {
+    return DEFAULT_CHAT_SETTINGS;
+  }
+}
 
 export const LMSTUDIO_ENDPOINTS = [
   '/api/v1/chat',
@@ -27,6 +64,8 @@ interface AppContextType {
   activeProvider: Provider | null;
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
+  chatSettings: ChatSettings;
+  setChatSettings: (settings: ChatSettings) => void;
   setActiveProvider: (provider: Provider | null) => void;
   setActiveConversationId: (id: string | null) => void;
   refreshConversations: () => Promise<void>;
@@ -64,11 +103,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [activeProvider, setActiveProvider] = useState<Provider | null>(null);
+  const [activeProvider, setActiveProviderState] = useState<Provider | null>(null);
+
+  const setActiveProvider = useCallback((p: Provider | null) => {
+    setActiveProviderState(p);
+    if (p) {
+      localStorage.setItem('active-provider-id', p.id);
+    } else {
+      localStorage.removeItem('active-provider-id');
+    }
+  }, []);
   const [theme, setThemeState] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem('chat-theme');
     return (saved as ThemeMode) || 'dark';
   });
+  const [chatSettings, setChatSettingsState] = useState<ChatSettings>(loadChatSettings);
 
   useEffect(() => {
     localStorage.setItem('chat-theme', theme);
@@ -79,8 +128,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme]);
 
+  useEffect(() => {
+    localStorage.setItem('chat-settings', JSON.stringify(chatSettings));
+    const root = document.documentElement;
+    root.style.setProperty('--chat-font-family', CHAT_FONT_STACKS[chatSettings.font_family]);
+    root.style.setProperty('--chat-font-size', `${chatSettings.font_size}px`);
+  }, [chatSettings]);
+
   const setTheme = useCallback((t: ThemeMode) => {
     setThemeState(t);
+  }, []);
+
+  const setChatSettings = useCallback((s: ChatSettings) => {
+    setChatSettingsState(s);
   }, []);
 
   const refreshConversations = useCallback(async () => {
@@ -116,9 +176,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
     setProviders(normalized);
     if (normalized.length > 0 && !activeProvider) {
-      setActiveProvider(normalized[0]);
+      const savedId = localStorage.getItem('active-provider-id');
+      const restored = savedId ? normalized.find((p) => p.id === savedId) : null;
+      setActiveProvider(restored ?? normalized[0]);
     }
-  }, [activeProvider]);
+  }, [activeProvider, setActiveProvider]);
 
   const createConversation = useCallback(
     async (title: string) => {
@@ -237,6 +299,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     activeProvider,
     theme,
     setTheme,
+    chatSettings,
+    setChatSettings,
     setActiveProvider,
     setActiveConversationId,
     refreshConversations,

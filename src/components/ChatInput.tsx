@@ -139,7 +139,7 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
   if (!activeProvider) {
     return (
       <div className="border-t theme-border px-4 py-3">
-        <div className="max-w-chat-max mx-auto text-center">
+        <div className="max-w-chat-input-max mx-auto text-center">
           <p className="text-xs text-gray-500">
             No provider configured. Go to Settings to add one.
           </p>
@@ -150,113 +150,33 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
 
   return (
     <div className="border-t theme-border theme-main">
-      <div className="max-w-chat-max mx-auto px-4 py-3">
-        {/* Provider and model selector */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="relative flex items-center gap-3">
-            {/* Provider selector */}
-            <div className="relative">
-              <button
-                onClick={() => { setShowProviderDropdown(!showProviderDropdown); setShowModelDropdown(false); }}
-                className="flex items-center gap-1.5 text-xs theme-text-secondary hover-theme-text-primary transition-colors"
-              >
-                <span>{activeProvider.name}</span>
-                {showProviderDropdown ? (
-                  <ChevronUp className="w-3 h-3" />
-                ) : (
-                  <ChevronDown className="w-3 h-3" />
-                )}
-              </button>
-
-              {showProviderDropdown && providers.length > 1 && (
-                <div className="absolute bottom-full mb-2 left-0 theme-sidebar border theme-border-light rounded-lg shadow-xl py-1 min-w-[200px] z-10">
-                  {providers.map((p) => (
-                    <button
-                      key={p.id}
-                      className="w-full text-left px-3 py-2 text-xs theme-text-primary hover:bg-sidebar-hover transition-colors"
-                      onClick={() => {
-                        setActiveProvider(p);
-                        setShowProviderDropdown(false);
-                      }}
-                    >
-                      <div className="font-medium">{p.name}</div>
-                    </button>
-                  ))}
-                </div>
+      <div className="max-w-chat-input-max mx-auto px-4 py-3">
+        {/* Token stats (right-aligned, above input) */}
+        {maxTokens && (
+          <div className={`text-xs font-mono flex items-center justify-center gap-3 mb-2 ${
+            usedTokens > 0 && remainingTokens! < maxTokens * 0.8
+              ? remainingTokens! < maxTokens * 0.5
+                ? 'text-red-400'
+                : 'text-yellow-400'
+              : 'text-gray-500'
+          }`}>
+            <span>
+              {usedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens
+              <span className="theme-text-muted ml-1">
+                ({(((maxTokens - usedTokens) / maxTokens) * 100).toFixed(1)}% left)
+              </span>
+            </span>
+            <span className="theme-text-muted">
+              ↑ {inputTokens.toLocaleString()} · ↓ {outputTokens.toLocaleString()}
+              {reasoningTokens > 0 && (
+                <> · 🧠 {reasoningTokens.toLocaleString()}</>
               )}
-            </div>
-
-            {/* Model selector */}
-            {availableModels.length > 1 && (
-              <div className="relative" ref={modelDropdownRef}>
-                <button
-                  onClick={() => { setShowModelDropdown(!showModelDropdown); setShowProviderDropdown(false); }}
-                  className="flex items-center gap-1 text-xs theme-text-secondary hover-theme-text-primary transition-colors"
-                >
-                  <span className="text-gray-500">model:</span>
-                  <span className="font-mono text-[11px] truncate max-w-[180px]">{displayModelName()}</span>
-                  {showModelDropdown ? (
-                    <ChevronUp className="w-3 h-3" />
-                  ) : (
-                    <ChevronDown className="w-3 h-3" />
-                  )}
-                </button>
-
-                {showModelDropdown && (
-                  <div className="absolute bottom-full mb-2 left-0 theme-sidebar border theme-border-light rounded-lg shadow-xl py-1 min-w-[220px] max-h-[240px] overflow-y-auto z-20">
-                    {availableModels.map((m) => (
-                      <button
-                        key={m.key}
-                        className={`w-full text-left px-3 py-2 text-xs transition-colors ${
-                          m.key === displayModelName()
-                            ? 'bg-gray-700 theme-text-primary'
-                            : 'theme-text-primary hover:bg-sidebar-hover'
-                        }`}
-                        onClick={() => handleModelChange(m.key)}
-                      >
-                        <div className="font-medium truncate">{m.display_name || m.key}</div>
-                        {m.model_info?.max_context_length && (
-                          <div className="text-gray-500 text-[10px]">
-                            {Number(m.model_info.max_context_length).toLocaleString()} tokens
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            </span>
           </div>
+        )}
 
-          {/* Context/tokens display */}
-          {maxTokens && (
-            <div className={`text-xs font-mono flex flex-col items-end gap-0.5 ${
-              usedTokens > 0 && remainingTokens! < maxTokens * 0.8
-                ? remainingTokens! < maxTokens * 0.5
-                  ? 'text-red-400'
-                  : 'text-yellow-400'
-                : 'text-gray-500'
-            }`}>
-              <div>
-                {usedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens
-                <span className="theme-text-muted ml-1">
-                  ({(((maxTokens - usedTokens) / maxTokens) * 100).toFixed(1)}% left)
-                </span>
-              </div>
-              <div className="theme-text-muted">
-                in: {inputTokens.toLocaleString()} · out: {outputTokens.toLocaleString()}
-                {reasoningTokens > 0 && (
-                  <>
-                    {' · '}reasoning: {reasoningTokens.toLocaleString()}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Input area */}
-        <div className="relative flex items-end theme-input border theme-border-light rounded-2xl focus-within:border-gray-500 transition-colors">
+        {/* Input area — textarea + integrated selectors and send button */}
+        <div className="chat-input-container flex flex-col border theme-border-light rounded-2xl">
           <textarea
             ref={textareaRef}
             value={input}
@@ -264,19 +184,97 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
             onKeyDown={handleKeyDown}
             placeholder="Message..."
             rows={1}
-            className="chat-input flex-1 bg-transparent text-sm px-4 py-3 pr-12 focus:outline-none resize-none placeholder-gray-500"
+            className="chat-input bg-transparent text-sm px-4 pt-3 pb-2 focus:outline-none resize-none placeholder-gray-500"
           />
-          <button
-            onClick={handleSubmit}
-            disabled={!input.trim()}
-            className={`absolute right-2 bottom-2 p-2 rounded-full transition-all ${
-              input.trim()
-                ? 'bg-gray-600 hover:bg-gray-500 theme-text-primary'
-                : 'bg-transparent theme-text-muted cursor-not-allowed'
-            }`}
-          >
-            <Send className="w-4 h-4" />
-          </button>
+          {/* Bottom bar: provider + model on left, send on right */}
+          <div className="flex items-center justify-between px-3 pb-2 pt-1">
+            <div className="flex items-center gap-3 min-w-0">
+              {/* Provider selector */}
+              <div className="relative">
+                <button
+                  onClick={() => { setShowProviderDropdown(!showProviderDropdown); setShowModelDropdown(false); }}
+                  className="flex items-center gap-1.5 text-xs theme-text-secondary hover-theme-text-primary transition-colors"
+                >
+                  <span>{activeProvider.name}</span>
+                  {showProviderDropdown ? (
+                    <ChevronUp className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                </button>
+
+                {showProviderDropdown && providers.length > 1 && (
+                  <div className="absolute bottom-full mb-2 left-0 theme-sidebar border theme-border-light rounded-lg shadow-xl py-1 min-w-[200px] z-10">
+                    {providers.map((p) => (
+                      <button
+                        key={p.id}
+                        className="w-full text-left px-3 py-2 text-xs theme-text-primary hover-theme-sidebar-hover transition-colors"
+                        onClick={() => {
+                          setActiveProvider(p);
+                          setShowProviderDropdown(false);
+                        }}
+                      >
+                        <div className="font-medium">{p.name}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Model selector */}
+              {availableModels.length > 1 && (
+                <div className="relative min-w-0" ref={modelDropdownRef}>
+                  <button
+                    onClick={() => { setShowModelDropdown(!showModelDropdown); setShowProviderDropdown(false); }}
+                    className="flex items-center gap-1 text-xs theme-text-secondary hover-theme-text-primary transition-colors min-w-0"
+                  >
+                    <span className="text-gray-500">model:</span>
+                    <span className="font-mono text-[11px] truncate max-w-[180px]">{displayModelName()}</span>
+                    {showModelDropdown ? (
+                      <ChevronUp className="w-3 h-3 flex-shrink-0" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 flex-shrink-0" />
+                    )}
+                  </button>
+
+                  {showModelDropdown && (
+                    <div className="absolute bottom-full mb-2 left-0 theme-sidebar border theme-border-light rounded-lg shadow-xl py-1 min-w-[220px] max-h-[240px] overflow-y-auto z-20">
+                      {availableModels.map((m) => (
+                        <button
+                          key={m.key}
+                          className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                            m.key === displayModelName()
+                              ? 'theme-sidebar-active theme-text-primary'
+                              : 'theme-text-primary hover-theme-sidebar-hover'
+                          }`}
+                          onClick={() => handleModelChange(m.key)}
+                        >
+                          <div className="font-medium truncate">{m.display_name || m.key}</div>
+                          {m.model_info?.max_context_length && (
+                            <div className="text-gray-500 text-[10px]">
+                              {Number(m.model_info.max_context_length).toLocaleString()} tokens
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleSubmit}
+              disabled={!input.trim()}
+              className={`p-2 rounded-full transition-all flex-shrink-0 ${
+                input.trim()
+                  ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
+                  : 'bg-transparent theme-text-muted cursor-not-allowed'
+              }`}
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <p className="text-[10px] theme-text-muted text-center mt-2">

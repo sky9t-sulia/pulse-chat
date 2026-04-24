@@ -62,3 +62,11 @@ export interface ChatSession {
 }
 
 export type ThemeMode = 'dark' | 'light';
+
+export type ChatFontFamily = 'system' | 'sans' | 'serif' | 'mono' | 'inter';
+
+export interface ChatSettings {
+  system_prompt: string;
+  font_family: ChatFontFamily;
+  font_size: number;
+}

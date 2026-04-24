@@ -5,7 +5,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
-import { StopCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { StopCircle, Loader2, ChevronDown, ChevronUp, Plus, MessageSquare } from 'lucide-react';
 import type { Message } from '../types';
 import type { LoadingPhase } from '../context/useChat';
 
@@ -263,7 +263,7 @@ function MessageBubble({ message }: { message: Message }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
       <div
-        className={`chat-content chat-text max-w-[85%] ${
+        className={`chat-content chat-text ${
           isUser
             ? 'theme-input px-4 py-2.5 rounded-2xl rounded-br-md'
             : ''
@@ -305,32 +305,63 @@ function LoadingIndicator({ phase }: { phase: LoadingPhase }) {
 }
 
 export default function ChatArea({ streamingContent, streamingReasoningContent, isStreaming, loadingPhase, onStop, scrollRef }: Props) {
-  const { activeConversationId, messages } = useApp();
+  const {
+    activeConversationId,
+    messages,
+    conversations,
+    createConversation,
+    setActiveConversationId,
+    activeProvider,
+  } = useApp();
   const showLoading = isStreaming && loadingPhase.kind !== 'idle' && loadingPhase.kind !== 'streaming';
 
   if (!activeConversationId) {
+    const recent = conversations.slice(0, 5);
+    const handleNewChat = async () => {
+      const conv = await createConversation('New Chat');
+      setActiveConversationId(conv.id);
+    };
+
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full theme-sidebar-active flex items-center justify-center">
-            <svg
-              className="w-8 h-8 text-gray-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"
-              />
-            </svg>
-          </div>
-          <h2 className="text-xl font-medium theme-text-heading mb-2">Welcome to Chat</h2>
-          <p className="text-sm theme-text-muted">
-            Select or create a conversation to get started
+      <div className="flex-1 flex items-center justify-center px-6">
+        <div className="w-full max-w-xl">
+          <h1 className="text-3xl font-semibold theme-text-heading mb-2 text-center">
+            What can I help with?
+          </h1>
+          <p className="text-sm theme-text-muted text-center mb-8">
+            {activeProvider ? (
+              <>Using <span className="theme-text-secondary">{activeProvider.name}</span></>
+            ) : (
+              'Configure a provider in Settings to get started.'
+            )}
           </p>
+
+          <button
+            onClick={handleNewChat}
+            disabled={!activeProvider}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 theme-input border theme-border-light rounded-xl theme-text-primary hover-theme-sidebar-hover transition-all text-sm mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-4 h-4" />
+            Start a new chat
+          </button>
+
+          {recent.length > 0 && (
+            <div>
+              <h3 className="text-xs theme-text-muted mb-2 px-1 uppercase tracking-wide">Recent</h3>
+              <div className="space-y-1">
+                {recent.map((conv) => (
+                  <button
+                    key={conv.id}
+                    onClick={() => setActiveConversationId(conv.id)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg theme-text-primary hover-theme-sidebar-hover transition-all text-left"
+                  >
+                    <MessageSquare className="w-4 h-4 flex-shrink-0 theme-text-secondary" />
+                    <span className="flex-1 text-sm truncate">{conv.title}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -362,7 +393,7 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
   return (
     <div className="flex-1 flex flex-col h-full min-h-0">
       <div className="flex-1 overflow-y-auto scroll-smooth min-h-0 px-4 sm:px-6 lg:px-20 py-6">
-        <div className="max-w-chat-max mx-auto">
+        <div className="max-w-chat-max mx-auto px-4">
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
           ))}

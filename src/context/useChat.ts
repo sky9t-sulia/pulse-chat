@@ -27,39 +27,42 @@ function buildRequestBody(
   kind: ApiKind,
   model: string,
   messages: { role: string; content: string }[],
+  systemPrompt: string,
   previousResponseId?: string
 ): Record<string, unknown> {
+  const withSystem = systemPrompt
+    ? [{ role: 'system', content: systemPrompt }, ...messages]
+    : messages;
   const latestUserMsg = [...messages].reverse().find((m) => m.role === 'user');
   switch (kind) {
-    case 'lmstudio-chat': {
-      const body: Record<string, unknown> = {
-        model,
-        input: latestUserMsg?.content ?? '',
-        stream: true,
-      };
-      if (previousResponseId) body.previous_response_id = previousResponseId;
-      return body;
-    }
+    case 'lmstudio-chat':
     case 'lmstudio-responses': {
+      // Stateful endpoints — `input` is the new turn only; prior history is
+      // tracked server-side via previous_response_id.
       const body: Record<string, unknown> = {
         model,
         input: latestUserMsg?.content ?? '',
         stream: true,
       };
+      if (systemPrompt) body.system_prompt = systemPrompt;
       if (previousResponseId) body.previous_response_id = previousResponseId;
       return body;
     }
-    case 'lmstudio-messages':
-      return {
+    case 'lmstudio-messages': {
+      // Anthropic Messages API takes system as a top-level field, not a message role
+      const body: Record<string, unknown> = {
         model,
         max_tokens: 2048,
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
         stream: true,
       };
+      if (systemPrompt) body.system = systemPrompt;
+      return body;
+    }
     default: {
       const body: Record<string, unknown> = {
         model,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: withSystem.map((m) => ({ role: m.role, content: m.content })),
         stream: true,
         stream_options: { include_usage: true },
       };
@@ -70,7 +73,7 @@ function buildRequestBody(
 }
 
 export function useChat() {
-  const { messages, activeConversationId, addMessage } = useApp();
+  const { messages, activeConversationId, addMessage, chatSettings } = useApp();
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingReasoningContent, setStreamingReasoningContent] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -119,7 +122,13 @@ export function useChat() {
         .map((m) => ({ role: m.role, content: m.content }));
       const kind = getApiKind(provider);
       const chatUrl = getFullChatUrl(provider);
-      const body = buildRequestBody(kind, usedModel, chatMessages, responseIdRef.current[convId]);
+      const body = buildRequestBody(
+        kind,
+        usedModel,
+        chatMessages,
+        chatSettings.system_prompt,
+        responseIdRef.current[convId]
+      );
 
       setIsStreaming(true);
       setStreamingContent('');
@@ -331,10 +340,19 @@ export function useChat() {
                         accumulatedContent += json.choices[0].delta.content;
                         setStreamingContent(accumulatedContent);
                       }
-                      // LM Studio may include reasoning alongside content in message delta
-                      if (json.reasoning) {
-                        accumulatedReasoningContent += json.reasoning;
-                        setStreamingReasoningContent(accumulatedReasoningContent);
+                      // Reasoning for OpenAI-compatible streams:
+                      //   - OpenRouter / LM Studio: choices[0].delta.reasoning
+                      //   - DeepSeek R1-style: choices[0].delta.reasoning_content
+                      //   - LM Studio top-level: json.reasoning
+                      {
+                        const delta = json.choices?.[0]?.delta;
+                        const reasoningChunk =
+                          delta?.reasoning ?? delta?.reasoning_content ?? json.reasoning ?? '';
+                        if (reasoningChunk) {
+                          setLoadingPhase({ kind: 'streaming' });
+                          accumulatedReasoningContent += reasoningChunk;
+                          setStreamingReasoningContent(accumulatedReasoningContent);
+                        }
                       }
                       // OpenAI sends usage in the final chunk when stream_options.include_usage is set
                       if (json.usage) {
@@ -385,7 +403,7 @@ export function useChat() {
       setIsStreaming(false);
       setLoadingPhase({ kind: 'idle' });
     },
-    [activeConversationId, isStreaming, addMessage]
+    [activeConversationId, isStreaming, addMessage, chatSettings.system_prompt]
   );
 
   const stop = useCallback(() => {

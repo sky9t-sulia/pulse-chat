@@ -21,6 +21,7 @@ export default {
       },
       maxWidth: {
         'chat-max': '720px',
+        'chat-input-max': 'calc(720px + 2rem)',
       },
     },
   },

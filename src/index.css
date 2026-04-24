@@ -5,54 +5,63 @@
 /* ─── Base styles ─────────────────────────────────────────── */
 
 :root {
-  /* Dark theme (default) */
-  --bg-main: #1a1a1a;
-  --bg-sidebar: #121212;
-  --bg-sidebar-hover: #1e1e1e;
-  --bg-sidebar-active: #2a2a2a;
-  --bg-main-hover: #252525;
-  --bg-input: #2c2c2c;
-  --bg-input-focus: #3a3a3a;
-  --bg-border: #2a2a2a;
-  --bg-border-light: #333333;
-  --text-primary: #e0e0e0;
-  --text-secondary: #888;
-  --text-tertiary: #666;
-  --text-heading: #f0f0f0;
-  --text-muted: #6b7280;
-  --scrollbar-thumb: #333;
-  --scrollbar-thumb-hover: #555;
-  --copy-btn-bg: #333;
-  --copy-btn-text: #ccc;
-  --copy-btn-hover-bg: #d0d0d0;
-  --copy-btn-hover-text: #333;
-  --modal-bg: #1e1e1e;
-  --modal-bg-light: #ffffff;
+  /* Dark theme (default) — warm charcoal, Claude-inspired */
+  --bg-main: #262624;
+  --bg-sidebar: #1f1f1c;
+  --bg-sidebar-hover: #2e2e2a;
+  --bg-sidebar-active: #3a3a35;
+  --bg-main-hover: #2d2d2a;
+  --bg-input: #30302d;
+  --bg-input-focus: #3a3a35;
+  --bg-border: #36352f;
+  --bg-border-light: #45443c;
+  --text-primary: #f5f4ee;
+  --text-secondary: #a8a29e;
+  --text-tertiary: #7d7872;
+  --text-heading: #faf9f5;
+  --text-muted: #7d7872;
+  --scrollbar-thumb: #45443c;
+  --scrollbar-thumb-hover: #5a5950;
+  --copy-btn-bg: #45443c;
+  --copy-btn-text: #e0ddd2;
+  --copy-btn-hover-bg: #d4d0c2;
+  --copy-btn-hover-text: #3d3929;
+  --modal-bg: #2a2a27;
+  --modal-bg-light: #faf9f5;
+  --accent: #c15f3c;
+  --accent-hover: #d97757;
+  --bg-chat-input: #30302d;
+  --chat-input-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
 .light {
-  --bg-main: #ffffff;
-  --bg-sidebar: #f5f5f5;
-  --bg-sidebar-hover: #e8e8e8;
-  --bg-sidebar-active: #d8d8d8;
-  --bg-main-hover: #f0f0f0;
-  --bg-input: #f0f0f0;
-  --bg-input-focus: #e0e0e0;
-  --bg-border: #e0e0e0;
-  --bg-border-light: #d0d0d0;
-  --text-primary: #1a1a1a;
-  --text-secondary: #666;
-  --text-tertiary: #888;
-  --text-heading: #111827;
-  --text-muted: #6b7280;
-  --scrollbar-thumb: #ccc;
-  --scrollbar-thumb-hover: #999;
-  --copy-btn-bg: #333;
-  --copy-btn-text: #ccc;
-  --copy-btn-hover-bg: #d0d0d0;
-  --copy-btn-hover-text: #333;
-  --modal-bg: #1e1e1e;
-  --modal-bg-light: #ffffff;
+  /* Light theme — clean off-white, neutral */
+  --bg-main: #f8f8f6;
+  --bg-sidebar: #f0f0ee;
+  --bg-sidebar-hover: #e8e8e6;
+  --bg-sidebar-active: #dcdcda;
+  --bg-main-hover: #eeeeec;
+  --bg-input: #ececea;
+  --bg-input-focus: #e0e0de;
+  --bg-border: #e0e0de;
+  --bg-border-light: #d0d0ce;
+  --text-primary: #121212;
+  --text-secondary: #5a5a58;
+  --text-tertiary: #7d7d7b;
+  --text-heading: #121212;
+  --text-muted: #7d7d7b;
+  --scrollbar-thumb: #d0d0ce;
+  --scrollbar-thumb-hover: #a0a09e;
+  --copy-btn-bg: #121212;
+  --copy-btn-text: #f8f8f6;
+  --copy-btn-hover-bg: #dcdcda;
+  --copy-btn-hover-text: #121212;
+  --modal-bg: #2a2a27;
+  --modal-bg-light: #f8f8f6;
+  --accent: #c15f3c;
+  --accent-hover: #b04e2d;
+  --bg-chat-input: #ffffff;
+  --chat-input-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 body {
@@ -100,6 +109,14 @@ body {
 .chat-content {
   word-wrap: break-word;
   overflow-wrap: break-word;
+  font-size: var(--chat-font-size, 16px);
+}
+
+/* Font family applies only to prose body text — not headings, code, tables, or chrome. */
+.chat-content p,
+.chat-content li,
+.chat-content blockquote {
+  font-family: var(--chat-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
 }
 
 .chat-content p {
@@ -266,8 +283,18 @@ body {
 .chat-input {
   resize: none;
   field-sizing: content;
-  min-height: 24px;
-  max-height: 200px;
+  min-height: 72px;
+  max-height: 240px;
+}
+
+.chat-input-container {
+  background: var(--bg-chat-input);
+  box-shadow: var(--chat-input-shadow);
+  transition: border-color 0.15s;
+}
+
+.chat-input-container:focus-within {
+  border-color: rgb(107 114 128 / 0.5);
 }
 
 /* ─── Sidebar item hover animation ────────────────────────── */

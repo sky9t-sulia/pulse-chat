@@ -1,6 +1,6 @@
 import { useApp } from '../context/AppContext';
-import { Plus, Trash2, Settings, Sun, Moon } from 'lucide-react';
-import { useState } from 'react';
+import { Plus, Trash2, Settings, Sun, Moon, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import SettingsModal from './SettingsModal';
 import type { Conversation } from '../types';
 
@@ -61,6 +61,13 @@ export default function Sidebar() {
   } = useApp();
 
   const [showSettings, setShowSettings] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar-collapsed') === '1';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', collapsed ? '1' : '0');
+  }, [collapsed]);
 
   const handleNewChat = async () => {
     const conv = await createConversation('New Chat');
@@ -68,54 +75,80 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 flex-shrink-0 theme-sidebar flex flex-col h-full border-r theme-border">
-      {/* Header */}
-      <div className="p-3">
+    <aside
+      className={`flex-shrink-0 theme-sidebar flex flex-col h-full border-r theme-border transition-[width] duration-150 ${
+        collapsed ? 'w-12' : 'w-72'
+      }`}
+    >
+      {/* Header: toggle + new chat */}
+      <div className={`p-2 flex items-center gap-1 ${collapsed ? 'flex-col' : ''}`}>
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="sidebar-item p-2 rounded-lg theme-text-secondary hover-theme-text-primary"
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+        </button>
         <button
           onClick={handleNewChat}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-transparent border theme-border-light rounded-lg theme-text-primary hover-theme-sidebar-hover transition-all text-sm"
+          className={`sidebar-item p-2 rounded-lg theme-text-secondary hover-theme-text-primary ${
+            collapsed ? '' : 'ml-auto'
+          }`}
+          title="New chat"
         >
           <Plus className="w-4 h-4" />
-          New Chat
         </button>
       </div>
 
-      {/* Conversation list */}
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
-        {conversations.length === 0 && (
-          <div className="px-3 py-8 text-center">
-            <p className="text-xs theme-text-tertiary">No conversations yet</p>
-          </div>
-        )}
-        {conversations.map((conv) => (
-          <ConversationItem
-            key={conv.id}
-            conversation={conv}
-            isActive={conv.id === activeConversationId}
-            onSelect={setActiveConversationId}
-            onDelete={deleteConversation}
-          />
-        ))}
-      </div>
+      {/* Conversation list (hidden when collapsed) */}
+      {!collapsed && (
+        <div className="flex-1 overflow-y-auto px-2 pb-2">
+          {conversations.length === 0 && (
+            <div className="px-3 py-8 text-center">
+              <p className="text-xs theme-text-tertiary">No conversations yet</p>
+            </div>
+          )}
+          {conversations.map((conv) => (
+            <ConversationItem
+              key={conv.id}
+              conversation={conv}
+              isActive={conv.id === activeConversationId}
+              onSelect={setActiveConversationId}
+              onDelete={deleteConversation}
+            />
+          ))}
+        </div>
+      )}
+      {collapsed && <div className="flex-1" />}
 
       {/* Footer */}
-      <div className="p-3 border-t theme-border space-y-1">
+      <div className={`border-t theme-border ${collapsed ? 'p-2 space-y-1' : 'p-3 space-y-1'}`}>
         {/* Theme toggle */}
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="sidebar-item w-full flex items-center gap-2 px-3 py-2 rounded-lg theme-text-secondary hover-theme-text-primary text-sm"
+          className={`sidebar-item rounded-lg theme-text-secondary hover-theme-text-primary text-sm ${
+            collapsed
+              ? 'w-full flex items-center justify-center p-2'
+              : 'w-full flex items-center gap-2 px-3 py-2'
+          }`}
+          title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+          {!collapsed && <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>}
         </button>
 
         {/* Settings */}
         <button
           onClick={() => setShowSettings(true)}
-          className="sidebar-item w-full flex items-center gap-2 px-3 py-2 rounded-lg theme-text-secondary hover-theme-text-primary text-sm"
+          className={`sidebar-item rounded-lg theme-text-secondary hover-theme-text-primary text-sm ${
+            collapsed
+              ? 'w-full flex items-center justify-center p-2'
+              : 'w-full flex items-center gap-2 px-3 py-2'
+          }`}
+          title="Settings"
         >
           <Settings className="w-4 h-4" />
-          <span>Settings</span>
+          {!collapsed && <span>Settings</span>}
         </button>
       </div>
 

@@ -1,8 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useApp, LMSTUDIO_ENDPOINTS } from '../context/AppContext';
+import {
+  useApp,
+  LMSTUDIO_ENDPOINTS,
+  CHAT_FONT_STACKS,
+  CHAT_FONT_SIZE_STEPS,
+} from '../context/AppContext';
 import { strategies } from '../context/providers';
-import type { Provider, ModelInfo } from '../types';
+import type { Provider, ModelInfo, ChatFontFamily } from '../types';
 import { X, Plus, Save, Trash2, Eye, EyeOff, Loader2, Pencil } from 'lucide-react';
+
+const FONT_FAMILY_OPTIONS: { value: ChatFontFamily; label: string }[] = [
+  { value: 'system', label: 'System Default' },
+  { value: 'sans', label: 'Sans Serif' },
+  { value: 'serif', label: 'Serif' },
+  { value: 'mono', label: 'Monospace' },
+  { value: 'inter', label: 'Inter' },
+];
 
 const API_TYPE_OPTIONS: { value: 'openai' | 'lmstudio'; label: string }[] = [
   { value: 'openai', label: 'OpenAI Compatible' },
@@ -448,7 +461,7 @@ function ProviderForm({
         </button>
         <button
           type="submit"
-          className="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg transition-colors flex items-center gap-1"
+          className="px-4 py-2 text-sm bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors flex items-center gap-1"
         >
           <Save className="w-3.5 h-3.5" />
           {initial ? 'Update' : 'Add'}
@@ -458,15 +471,212 @@ function ProviderForm({
   );
 }
 
-function SettingsModal({ onClose }: { onClose: () => void }) {
-  const { providers, addProvider, updateProvider, deleteProvider, setActiveProvider } = useApp();
+function ProvidersTab() {
+  const { providers, activeProvider, addProvider, updateProvider, deleteProvider, setActiveProvider } = useApp();
   const [editingProvider, setEditingProvider] = useState<Provider | undefined>();
   const [showForm, setShowForm] = useState(false);
 
   return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-medium theme-text-primary">Providers</h3>
+        <button
+          onClick={() => {
+            setEditingProvider(undefined);
+            setShowForm(true);
+          }}
+          className="text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1"
+        >
+          <Plus className="w-3 h-3" />
+          Add Provider
+        </button>
+      </div>
+
+      {showForm ? (
+        <div className="theme-input border theme-border-light rounded-lg p-4 mb-3">
+          <ProviderForm
+            onSave={(data) => {
+              if (editingProvider) {
+                updateProvider(editingProvider.id, data);
+              } else {
+                addProvider(data);
+              }
+              setShowForm(false);
+              setEditingProvider(undefined);
+            }}
+            onCancel={() => {
+              setShowForm(false);
+              setEditingProvider(undefined);
+            }}
+            initial={editingProvider}
+          />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {providers.length === 0 && (
+            <p className="text-xs theme-text-muted py-4 text-center">
+              No providers configured
+            </p>
+          )}
+          {providers.map((provider) => {
+            const isActive = provider.id === activeProvider?.id;
+            return (
+            <div
+              key={provider.id}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all cursor-pointer ${
+                isActive
+                  ? 'border-gray-600 theme-sidebar-active'
+                  : 'theme-border hover-theme-border-light'
+              }`}
+              onClick={() => setActiveProvider(provider)}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm theme-text-primary font-medium">
+                    {provider.name}
+                  </span>
+                  <span className="text-[10px] theme-sidebar-active theme-text-secondary px-1.5 py-0.5 rounded">
+                    {provider.api_type === 'lmstudio' ? 'LM Studio' : 'OpenAI'}
+                  </span>
+                  {isActive && (
+                    <span className="text-[10px] bg-[var(--accent)] text-white px-1.5 py-0.5 rounded">
+                      Active
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs text-gray-500 truncate">
+                    {provider.default_model}
+                  </span>
+                  <span className="text-xs theme-text-muted">•</span>
+                  <span className="text-xs text-gray-500 truncate">
+                    {provider.api_url.replace(/https?:\/\//, '')}
+                  </span>
+                  <span className="text-xs theme-text-muted">•</span>
+                  <span className="text-xs text-gray-500 truncate font-mono">
+                    {provider.endpoint}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingProvider(provider);
+                    setShowForm(true);
+                  }}
+                  className="p-1 theme-text-secondary hover-theme-text-primary transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteProvider(provider.id);
+                  }}
+                  className="p-1 theme-text-secondary hover:text-red-400 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChatTab() {
+  const { chatSettings, setChatSettings } = useApp();
+  const minStep = 0;
+  const maxStep = CHAT_FONT_SIZE_STEPS.length - 1;
+  const currentStep = Math.max(
+    0,
+    (CHAT_FONT_SIZE_STEPS as readonly number[]).indexOf(chatSettings.font_size)
+  );
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">System Prompt</label>
+        <textarea
+          value={chatSettings.system_prompt}
+          onChange={(e) => setChatSettings({ ...chatSettings, system_prompt: e.target.value })}
+          placeholder="Optional — sent as the system message on every request."
+          rows={5}
+          className="w-full px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-primary focus:outline-none focus:border-gray-500 resize-y"
+        />
+        <p className="text-xs theme-text-muted mt-1">
+          Applied to new messages in every conversation.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">Font</label>
+        <select
+          value={chatSettings.font_family}
+          onChange={(e) =>
+            setChatSettings({
+              ...chatSettings,
+              font_family: e.target.value as ChatFontFamily,
+            })
+          }
+          className="w-full px-3 py-2 theme-input border theme-border-light rounded-lg text-sm theme-text-primary focus:outline-none focus:border-gray-500 bg-theme-input"
+        >
+          {FONT_FAMILY_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <p
+          className="text-xs theme-text-muted mt-2"
+          style={{ fontFamily: CHAT_FONT_STACKS[chatSettings.font_family] }}
+        >
+          The quick brown fox jumps over the lazy dog.
+        </p>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-xs text-gray-400">Font Size</label>
+          <span className="text-xs theme-text-secondary font-mono">
+            {chatSettings.font_size}px
+          </span>
+        </div>
+        <input
+          type="range"
+          min={minStep}
+          max={maxStep}
+          step={1}
+          value={currentStep}
+          onChange={(e) =>
+            setChatSettings({
+              ...chatSettings,
+              font_size: CHAT_FONT_SIZE_STEPS[Number(e.target.value)],
+            })
+          }
+          className="w-full accent-gray-500"
+        />
+        <div className="flex justify-between text-[10px] theme-text-muted mt-1 font-mono">
+          {CHAT_FONT_SIZE_STEPS.map((s) => (
+            <span key={s}>{s}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsModal({ onClose }: { onClose: () => void }) {
+  const [tab, setTab] = useState<'providers' | 'chat'>('providers');
+
+  return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium theme-text-heading">Settings</h2>
           <button
             onClick={onClose}
@@ -476,115 +686,32 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {/* Providers section */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium theme-text-primary">Providers</h3>
-            <button
-              onClick={() => {
-                setEditingProvider(undefined);
-                setShowForm(true);
-              }}
-              className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-200 px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1"
-            >
-              <Plus className="w-3 h-3" />
-              Add Provider
-            </button>
-          </div>
-
-          {showForm ? (
-            <div className="theme-input border theme-border-light rounded-lg p-4 mb-3">
-              <ProviderForm
-                onSave={(data) => {
-                  if (editingProvider) {
-                    updateProvider(editingProvider.id, data);
-                  } else {
-                    addProvider(data);
-                  }
-                  setShowForm(false);
-                  setEditingProvider(undefined);
-                }}
-                onCancel={() => {
-                  setShowForm(false);
-                  setEditingProvider(undefined);
-                }}
-                initial={editingProvider}
-              />
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {providers.length === 0 && (
-                <p className="text-xs theme-text-muted py-4 text-center">
-                  No providers configured
-                </p>
-              )}
-              {providers.map((provider, index) => (
-                <div
-                  key={provider.id}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all cursor-pointer ${
-                    index === 0
-                      ? 'border-gray-600 theme-sidebar-active'
-                      : 'theme-border hover-theme-border-light'
-                  }`}
-                  onClick={() => setActiveProvider(provider)}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm theme-text-primary font-medium">
-                        {provider.name}
-                      </span>
-                      <span className="text-[10px] bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">
-                        {provider.api_type === 'lmstudio' ? 'LM Studio' : 'OpenAI'}
-                      </span>
-                      {index === 0 && (
-                        <span className="text-[10px] bg-green-900 text-green-400 px-1.5 py-0.5 rounded">
-                          Active
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-gray-500 truncate">
-                        {provider.default_model}
-                      </span>
-                      <span className="text-xs theme-text-muted">•</span>
-                      <span className="text-xs text-gray-500 truncate">
-                        {provider.api_url.replace(/https?:\/\//, '')}
-                      </span>
-                      <span className="text-xs theme-text-muted">•</span>
-                      <span className="text-xs text-gray-500 truncate font-mono">
-                        {provider.endpoint}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingProvider(provider);
-                        setShowForm(true);
-                      }}
-                      className="p-1 theme-text-secondary hover-theme-text-primary transition-colors"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteProvider(provider.id);
-                      }}
-                      className="p-1 theme-text-secondary hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="flex gap-1 mb-5 border-b theme-border">
+          <button
+            onClick={() => setTab('providers')}
+            className={`px-3 py-2 text-sm transition-colors border-b-2 -mb-px ${
+              tab === 'providers'
+                ? 'theme-text-primary border-gray-400'
+                : 'theme-text-secondary border-transparent hover-theme-text-primary'
+            }`}
+          >
+            Providers
+          </button>
+          <button
+            onClick={() => setTab('chat')}
+            className={`px-3 py-2 text-sm transition-colors border-b-2 -mb-px ${
+              tab === 'chat'
+                ? 'theme-text-primary border-gray-400'
+                : 'theme-text-secondary border-transparent hover-theme-text-primary'
+            }`}
+          >
+            Chat
+          </button>
         </div>
 
-        {/* About */}
-        <div className="pt-4 border-t theme-border">
+        {tab === 'providers' ? <ProvidersTab /> : <ChatTab />}
+
+        <div className="pt-4 mt-6 border-t theme-border">
           <p className="text-xs theme-text-muted">
             Chat App v1.0.0 — A claude.ai-inspired desktop client
           </p>
