@@ -61,6 +61,7 @@ function buildRequestBody(
         model,
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
         stream: true,
+        stream_options: { include_usage: true },
       };
       if (previousResponseId) body.previous_response_id = previousResponseId;
       return body;
@@ -82,6 +83,20 @@ export function useChat() {
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    if (isStreaming) return;
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+    if (lastAssistant && (lastAssistant.input_tokens || lastAssistant.output_tokens)) {
+      setTokenStats({
+        input_tokens: lastAssistant.input_tokens || 0,
+        total_output_tokens: lastAssistant.output_tokens || 0,
+        reasoning_output_tokens: lastAssistant.reasoning_tokens || 0,
+      });
+    } else {
+      setTokenStats(null);
+    }
+  }, [activeConversationId, isStreaming, messages]);
 
   const scrollRef = useRef<HTMLDivElement>(null!);
   useEffect(() => {
@@ -113,6 +128,7 @@ export function useChat() {
 
       let accumulatedContent = '';
       let accumulatedReasoningContent = '';
+      let finalStats: TokenStats | null = null;
 
       try {
         const fetchInit: RequestInit = {
@@ -274,7 +290,8 @@ export function useChat() {
                       break;
                     case 'response.completed':
                       if (json.stats) {
-                        setTokenStats(json.stats as TokenStats);
+                        finalStats = json.stats as TokenStats;
+                        setTokenStats(finalStats);
                       }
                       break;
                     case 'chat.end':
@@ -293,10 +310,12 @@ export function useChat() {
                       }
                       // Also extract token stats from chat.end
                       if (json.result?.stats) {
-                        setTokenStats(json.result.stats as TokenStats);
+                        finalStats = json.result.stats as TokenStats;
+                        setTokenStats(finalStats);
                       } else if (json.stats) {
                         // Some LM Studio versions send stats at top level
-                        setTokenStats(json.stats as TokenStats);
+                        finalStats = json.stats as TokenStats;
+                        setTokenStats(finalStats);
                       }
                       // Also store response_id from chat.end result
                       if (json.result?.response_id) {
@@ -316,6 +335,16 @@ export function useChat() {
                       if (json.reasoning) {
                         accumulatedReasoningContent += json.reasoning;
                         setStreamingReasoningContent(accumulatedReasoningContent);
+                      }
+                      // OpenAI sends usage in the final chunk when stream_options.include_usage is set
+                      if (json.usage) {
+                        finalStats = {
+                          input_tokens: json.usage.prompt_tokens ?? 0,
+                          total_output_tokens: json.usage.completion_tokens ?? 0,
+                          reasoning_output_tokens:
+                            json.usage.completion_tokens_details?.reasoning_tokens ?? 0,
+                        };
+                        setTokenStats(finalStats);
                       }
                       break;
                   }
@@ -338,22 +367,17 @@ export function useChat() {
       }
 
       if (accumulatedContent) {
-        const msg = await addMessage(
+        await addMessage(
           convId,
           'assistant',
           accumulatedContent,
           usedModel,
           accumulatedReasoningContent || undefined,
-          tokenStats?.input_tokens,
-          tokenStats?.total_output_tokens,
-          tokenStats?.reasoning_output_tokens
+          finalStats?.input_tokens,
+          finalStats?.total_output_tokens,
+          finalStats?.reasoning_output_tokens
         );
-        // Restore token stats from the message we just saved
-        setTokenStats({
-          input_tokens: msg.input_tokens || 0,
-          total_output_tokens: msg.output_tokens || 0,
-          reasoning_output_tokens: msg.reasoning_tokens || 0,
-        });
+        if (finalStats) setTokenStats(finalStats);
       }
 
       setStreamingContent('');

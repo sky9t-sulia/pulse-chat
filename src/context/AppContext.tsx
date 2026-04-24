@@ -100,9 +100,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshProviders = useCallback(async () => {
     const list = await window.chatApi.providers.list();
     // Backward compatibility: ensure all providers have a models array
+    // and that every model has model_info with max_context_length
     const normalized = list.map((p) => ({
       ...p,
-      models: p.models ?? (p.model_info ? [{ key: p.default_model, model_info: p.model_info }] : []),
+      models: (p.models ?? (p.model_info ? [{ key: p.default_model, model_info: p.model_info }] : [])).map((m: any) => {
+        const info = m.model_info ?? {};
+        // If model_info is missing max_context_length, try to get it from the model object itself
+        // (LM Studio API puts max_context_length directly on model objects)
+        const maxCtx = info.max_context_length ?? (m.max_context_length as number);
+        return {
+          ...m,
+          model_info: maxCtx ? { ...info, max_context_length: maxCtx } : info,
+        };
+      }),
     }));
     setProviders(normalized);
     if (normalized.length > 0 && !activeProvider) {

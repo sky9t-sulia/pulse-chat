@@ -127,7 +127,7 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
     ? Number(selectedModelInfo.max_context_length)
     : activeProvider?.model_info?.max_context_length
       ? Number(activeProvider.model_info.max_context_length)
-      : null;
+      : 32768; // fallback: 32k if nothing configured
 
   // Use exact token stats from the last response
   const inputTokens = tokenStats?.input_tokens ?? 0;
@@ -229,21 +229,19 @@ export default function ChatInput({ onSend, tokenStats }: Props) {
           </div>
 
           {/* Context/tokens display */}
-          {maxTokens && (inputTokens > 0 || outputTokens > 0) && remainingTokens !== null && (
+          {maxTokens && (
             <div className={`text-xs font-mono flex flex-col items-end gap-0.5 ${
-              remainingTokens < maxTokens * 0.8
-                ? remainingTokens < maxTokens * 0.5
+              usedTokens > 0 && remainingTokens! < maxTokens * 0.8
+                ? remainingTokens! < maxTokens * 0.5
                   ? 'text-red-400'
                   : 'text-yellow-400'
                 : 'text-gray-500'
             }`}>
               <div>
                 {usedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens
-                {remainingTokens !== null && (
-                  <span className="theme-text-muted ml-1">
-                    ({(remainingTokens / maxTokens * 100).toFixed(1)}% left)
-                  </span>
-                )}
+                <span className="theme-text-muted ml-1">
+                  ({(((maxTokens - usedTokens) / maxTokens) * 100).toFixed(1)}% left)
+                </span>
               </div>
               <div className="theme-text-muted">
                 in: {inputTokens.toLocaleString()} · out: {outputTokens.toLocaleString()}
