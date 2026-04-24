@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import type { Conversation, Message, Provider, ThemeMode, ChatSettings, ChatFontFamily } from '../types';
+import type { Conversation, Message, Provider, ThemeMode, ChatSettings, ChatFontFamily, ToolInvocationRecord } from '../types';
 
 export const CHAT_FONT_STACKS: Record<ChatFontFamily, string> = {
   system: `Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`,
@@ -15,6 +15,7 @@ const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   system_prompt: '',
   font_family: 'system',
   font_size: 16,
+  max_calls_per_tool: 3,
 };
 
 function loadChatSettings(): ChatSettings {
@@ -35,6 +36,12 @@ function loadChatSettings(): ChatSettings {
         (CHAT_FONT_SIZE_STEPS as readonly number[]).includes(parsed.font_size)
           ? parsed.font_size
           : 16,
+      max_calls_per_tool:
+        typeof parsed.max_calls_per_tool === 'number' &&
+        parsed.max_calls_per_tool >= 1 &&
+        parsed.max_calls_per_tool <= 20
+          ? Math.floor(parsed.max_calls_per_tool)
+          : 3,
     };
   } catch {
     return DEFAULT_CHAT_SETTINGS;
@@ -80,7 +87,8 @@ interface AppContextType {
     inputTokens?: number,
     outputTokens?: number,
     reasoningTokens?: number,
-    durationMs?: number
+    durationMs?: number,
+    toolInvocations?: ToolInvocationRecord[] | null
   ) => Promise<Message>;
   deleteMessages: (conversationId: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
@@ -225,7 +233,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       inputTokens?: number,
       outputTokens?: number,
       reasoningTokens?: number,
-      durationMs?: number
+      durationMs?: number,
+      toolInvocations?: ToolInvocationRecord[] | null
     ) => {
       const msg = await window.chatApi.messages.add(
         conversationId,
@@ -236,7 +245,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         inputTokens,
         outputTokens,
         reasoningTokens,
-        durationMs
+        durationMs,
+        toolInvocations
       );
       setMessages((prev) => [...prev, msg as Message]);
       return msg as Message;

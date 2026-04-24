@@ -7,6 +7,16 @@ interface Conversation {
   updated_at: number;
 }
 
+interface ToolInvocationRecord {
+  id: string;
+  name: string;
+  arguments: string;
+  status: 'running' | 'done' | 'error';
+  result?: string;
+  error?: string;
+  durationMs?: number;
+}
+
 interface Message {
   id: string;
   conversation_id: string;
@@ -15,6 +25,7 @@ interface Message {
   reasoning?: string;
   created_at: number;
   model?: string;
+  tool_invocations?: ToolInvocationRecord[] | null;
 }
 
 interface Provider {
@@ -89,6 +100,7 @@ const chatApi = {
       outputTokens?: number,
       reasoningTokens?: number,
       durationMs?: number,
+      toolInvocations?: ToolInvocationRecord[] | null,
     ) =>
       ipcRenderer.invoke(
         'messages:add',
@@ -101,6 +113,7 @@ const chatApi = {
         outputTokens,
         reasoningTokens,
         durationMs,
+        toolInvocations,
       ) as Promise<Message>,
     delete: (conversationId: string) =>
       ipcRenderer.invoke('messages:delete', conversationId),

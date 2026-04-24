@@ -124,6 +124,13 @@ async function initDatabase() {
     // Column already exists or migration not needed
   }
 
+  // Migration: add tool_invocations column (JSON) if it doesn't exist yet
+  try {
+    db.run(`ALTER TABLE messages ADD COLUMN tool_invocations TEXT`);
+  } catch {
+    // Column already exists or migration not needed
+  }
+
   // Save on shutdown
   app.on('before-quit', () => {
     if (!db || !SQL) return;
@@ -136,43 +143,67 @@ async function initDatabase() {
 async function registerBuiltInTools() {
   if (!db || !SQL) return;
 
-  // Web Search tool
-  const webSearchDef = JSON.stringify({
-    type: 'function',
-    function: {
+  // JSON Schemas for built-in tool parameters.
+  // The DB column stores ONLY the schema; the `{type:'function', function:{...}}`
+  // wrapper is added by the client when building the request body.
+  const builtIns: Array<{
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  }> = [
+    {
       name: 'web_search',
-      description: 'Search the web for information. Use this when the user asks a question that requires up-to-date or factual information.',
+      description:
+        'Search the web for information using a search engine. Returns relevant results with titles, URLs, and snippets.',
       parameters: {
         type: 'object',
         properties: {
-          query: {
-            type: 'string',
-            description: 'The search query to look up',
-          },
+          query: { type: 'string', description: 'The search query to look up' },
         },
         required: ['query'],
       },
     },
-  });
+    {
+      name: 'fetch_url',
+      description:
+        'Fetch the text content of a web page by URL. Use this after web_search to read full page content when snippets are not enough (e.g. to get live data, specific numbers, or detailed information).',
+      parameters: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'The absolute http(s) URL to fetch' },
+        },
+        required: ['url'],
+      },
+    },
+  ];
 
   const now = Date.now();
-  const rows = query<any>(`SELECT id FROM tools WHERE name = 'web_search'`);
-  if (rows.length === 0) {
-    run(
-      'INSERT INTO tools (id, name, description, parameters, enabled, is_built_in, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        uuidv4(),
-        'web_search',
-        'Search the web for information using a search engine. Returns relevant results with titles, URLs, and snippets.',
-        webSearchDef,
-        1,
-        1,
-        now,
-        now,
-      ]
-    );
-    saveDb();
+  for (const tool of builtIns) {
+    const paramsJson = JSON.stringify(tool.parameters);
+    const rows = query<any>(`SELECT id, parameters FROM tools WHERE name = ?`, [tool.name]);
+    if (rows.length === 0) {
+      run(
+        'INSERT INTO tools (id, name, description, parameters, enabled, is_built_in, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [uuidv4(), tool.name, tool.description, paramsJson, 1, 1, now, now]
+      );
+      continue;
+    }
+    let parsed: any = null;
+    try {
+      parsed = typeof rows[0].parameters === 'string'
+        ? JSON.parse(rows[0].parameters)
+        : rows[0].parameters;
+    } catch {
+      parsed = null;
+    }
+    if (!parsed || parsed.type !== 'object') {
+      run(
+        'UPDATE tools SET parameters = ?, description = ?, updated_at = ? WHERE id = ?',
+        [paramsJson, tool.description, now, rows[0].id]
+      );
+    }
   }
+  saveDb();
 }
 
 function saveDb() {
@@ -303,10 +334,14 @@ ipcMain.handle('conversations:updateTitle', (_e, id: string, title: string) => {
 // ─── Messages ────────────────────────────────────────────────
 
 ipcMain.handle('messages:get', (_e, conversationId: string) => {
-  return query<any>(
-    `SELECT id, role, content, reasoning, created_at, model, input_tokens, output_tokens, reasoning_tokens, duration_ms FROM messages WHERE conversation_id = ? ORDER BY created_at ASC`,
+  const rows = query<any>(
+    `SELECT id, role, content, reasoning, created_at, model, input_tokens, output_tokens, reasoning_tokens, duration_ms, tool_invocations FROM messages WHERE conversation_id = ? ORDER BY created_at ASC`,
     [conversationId]
   );
+  return rows.map((row) => ({
+    ...row,
+    tool_invocations: row.tool_invocations ? JSON.parse(row.tool_invocations) : null,
+  }));
 });
 
 ipcMain.handle(
@@ -321,12 +356,15 @@ ipcMain.handle(
     inputTokens?: number,
     outputTokens?: number,
     reasoningTokens?: number,
-    durationMs?: number
+    durationMs?: number,
+    toolInvocations?: unknown[] | null
   ) => {
     const id = uuidv4();
     const now = Date.now();
+    const toolInvocationsJson =
+      toolInvocations && toolInvocations.length > 0 ? JSON.stringify(toolInvocations) : null;
     run(
-      'INSERT INTO messages (id, conversation_id, role, content, reasoning, created_at, model, input_tokens, output_tokens, reasoning_tokens, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO messages (id, conversation_id, role, content, reasoning, created_at, model, input_tokens, output_tokens, reasoning_tokens, duration_ms, tool_invocations) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         id,
         conversationId,
@@ -339,6 +377,7 @@ ipcMain.handle(
         outputTokens || 0,
         reasoningTokens || 0,
         durationMs || 0,
+        toolInvocationsJson,
       ]
     );
     run('UPDATE conversations SET updated_at = ? WHERE id = ?', [now, conversationId]);
@@ -354,6 +393,7 @@ ipcMain.handle(
       output_tokens: outputTokens || 0,
       reasoning_tokens: reasoningTokens || 0,
       duration_ms: durationMs || 0,
+      tool_invocations: toolInvocations && toolInvocations.length > 0 ? toolInvocations : null,
     };
   }
 );
@@ -552,59 +592,162 @@ ipcMain.handle('tools:execute', async (_e, toolName: string, toolArgsJson: strin
   // Built-in tools registry
   const builtInHandlers: Record<string, (args: any) => Promise<{ content: string; error?: string }>> = {
     web_search: async (args: { query: string }) => {
-      const encoded = encodeURIComponent(args.query);
-      const url = `https://html.duckduckgo.com/html/?q=${encoded}`;
+      // DDG's html endpoint returns a 202 challenge page unless we POST with
+      // proper browser-like headers (Referer in particular).
+      const decodeHtml = (s: string) =>
+        s
+          .replace(/<[^>]+>/g, '')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&nbsp;/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+      const unwrapDdgRedirect = (href: string): string => {
+        // DDG sometimes wraps outbound links as /l/?uddg=<encoded>
+        const m = href.match(/[?&]uddg=([^&]+)/);
+        if (m) {
+          try {
+            return decodeURIComponent(m[1]);
+          } catch {
+            return href;
+          }
+        }
+        if (href.startsWith('//')) return `https:${href}`;
+        return href;
+      };
 
       try {
-        const res = await fetch(url, {
+        const res = await fetch('https://html.duckduckgo.com/html/', {
+          method: 'POST',
           headers: {
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent':
+              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            Referer: 'https://html.duckduckgo.com/',
           },
+          body: new URLSearchParams({ q: args.query, kl: 'wt-wt' }).toString(),
         });
+
+        if (!res.ok) {
+          return { content: '', error: `Search HTTP ${res.status}` };
+        }
+
         const html = await res.text();
 
         const results: Array<{ title: string; url: string; snippet: string }> = [];
-        const snippets = html.match(/<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>[\s\S]*?<div[^>]*class="result__snippet"[^>]*>([^<]*)/g);
 
-        if (snippets) {
-          for (const block of snippets) {
-            const urlMatch = block.match(/href="([^"]*)"/);
-            const titleMatch = block.match(/class="result__a"[^>]*>([^<]*)/);
-            const snippetMatch = block.match(/class="result__snippet"[^>]*>([^<]*)/);
-            if (urlMatch && titleMatch && snippetMatch) {
-              results.push({
-                title: titleMatch[1].trim(),
-                url: urlMatch[1],
-                snippet: snippetMatch[1].trim(),
-              });
-            }
+        // Each result row: <a class="result__a" href="…">TITLE</a> … <a class="result__snippet" href="…">SNIPPET</a>
+        const rowRegex =
+          /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+
+        let match: RegExpExecArray | null;
+        while ((match = rowRegex.exec(html)) !== null) {
+          const url = unwrapDdgRedirect(match[1]);
+          const title = decodeHtml(match[2]);
+          const snippet = decodeHtml(match[3]);
+          if (title && url) {
+            results.push({ title, url, snippet });
+            if (results.length >= 8) break;
           }
         }
 
-        // Fallback parser
-        if (results.length === 0) {
-          const links = html.match(/<a[^>]*href="(https?:\/\/[^"]+)"[^>]*>([^<]*)<\/a>/g);
-          const seen = new Set<string>();
-          if (links) {
-            for (const link of links) {
-              const hrefMatch = link.match(/href="(https?:\/\/[^"]+)"/);
-              const textMatch = link.match(/>([^<]*)<\/a>/);
-              if (hrefMatch && textMatch && !hrefMatch[1].includes('duckduckgo') && !seen.has(hrefMatch[1])) {
-                seen.add(hrefMatch[1]);
-                results.push({ title: textMatch[1].trim(), url: hrefMatch[1], snippet: '' });
-                if (results.length >= 5) break;
-              }
-            }
-          }
-        }
-
-        const content = results.length > 0
-          ? results.map((r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet}`).join('\n\n')
-          : 'No results found.';
+        const content =
+          results.length > 0
+            ? results.map((r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet}`).join('\n\n')
+            : 'No results found.';
         return { content };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         return { content: '', error: `Search failed: ${msg}` };
+      }
+    },
+    fetch_url: async (args: { url: string }) => {
+      const MAX_CHARS = 8000;
+      if (!args.url || typeof args.url !== 'string') {
+        return { content: '', error: 'url argument is required' };
+      }
+
+      let parsed: URL;
+      try {
+        parsed = new URL(args.url);
+      } catch {
+        return { content: '', error: `Invalid URL: ${args.url}` };
+      }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return { content: '', error: `Unsupported protocol: ${parsed.protocol}` };
+      }
+      // Block obvious SSRF targets on the local machine / private LAN
+      const host = parsed.hostname;
+      if (
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host === '0.0.0.0' ||
+        host === '::1' ||
+        /^10\./.test(host) ||
+        /^192\.168\./.test(host) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+        /^169\.254\./.test(host)
+      ) {
+        return { content: '', error: `Refusing to fetch internal/private address: ${host}` };
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      try {
+        const res = await fetch(parsed.toString(), {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5',
+            'Accept-Language': 'en-US,en;q=0.5',
+          },
+          redirect: 'follow',
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          return { content: '', error: `HTTP ${res.status} fetching ${args.url}` };
+        }
+
+        const contentType = res.headers.get('content-type') || '';
+        const raw = await res.text();
+
+        let text = raw;
+        if (contentType.includes('html') || /<html[\s>]/i.test(raw.slice(0, 500))) {
+          // Strip script/style blocks, then tags, then collapse whitespace
+          text = raw
+            .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+            .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+            .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+            .replace(/<!--[\s\S]*?-->/g, ' ')
+            .replace(/<\/?(br|p|div|li|h[1-6]|tr|section|article)[^>]*>/gi, '\n')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&nbsp;/g, ' ')
+            .replace(/[ \t]+/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+        }
+
+        const truncated = text.length > MAX_CHARS;
+        if (truncated) text = text.slice(0, MAX_CHARS) + `\n\n[truncated — fetched ${raw.length} chars, showing first ${MAX_CHARS}]`;
+
+        return { content: `URL: ${parsed.toString()}\n\n${text}` };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: '', error: `Fetch failed: ${msg}` };
+      } finally {
+        clearTimeout(timeout);
       }
     },
   };

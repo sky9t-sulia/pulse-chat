@@ -7,7 +7,7 @@ import ChatInput from './components/ChatInput';
 import type { Provider } from './types';
 
 function ChatContainer() {
-  const { streamingContent, streamingReasoningContent, isStreaming, loadingPhase, tokenStats, scrollRef, scrollContainerRef, send, stop, resendMessage, regenerateMessage } = useChat();
+  const { streamingContent, streamingReasoningContent, isStreaming, loadingPhase, tokenStats, toolInvocations, scrollRef, scrollContainerRef, send, stop, resendMessage, regenerateMessage } = useChat();
   const { activeProvider, activeModel, deleteMessage } = useApp();
   const sendRef = useRef(send);
 
@@ -58,6 +58,7 @@ function ChatContainer() {
         streamingReasoningContent={streamingReasoningContent}
         isStreaming={isStreaming}
         loadingPhase={loadingPhase}
+        toolInvocations={toolInvocations}
         scrollRef={scrollRef}
         scrollContainerRef={scrollContainerRef}
         onResendMessage={activeProvider ? handleResendMessage : undefined}

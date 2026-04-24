@@ -5,6 +5,16 @@ export interface Conversation {
   updated_at: number;
 }
 
+export interface ToolInvocationRecord {
+  id: string;
+  name: string;
+  arguments: string;
+  status: 'running' | 'done' | 'error';
+  result?: string;
+  error?: string;
+  durationMs?: number;
+}
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -17,6 +27,7 @@ export interface Message {
   output_tokens?: number;
   reasoning_tokens?: number;
   duration_ms?: number;
+  tool_invocations?: ToolInvocationRecord[] | null;
 }
 
 export interface ProviderModel {
@@ -71,6 +82,7 @@ export interface ChatSettings {
   system_prompt: string;
   font_family: ChatFontFamily;
   font_size: number;
+  max_calls_per_tool: number;
 }
 
 export interface Tool {

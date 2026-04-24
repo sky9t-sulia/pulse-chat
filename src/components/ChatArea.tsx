@@ -7,20 +7,89 @@ import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import { ChevronDown, ChevronUp, Plus, MessageSquare, RotateCcw, Trash2, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, MessageSquare, RotateCcw, Trash2, RefreshCw, Wrench, Loader2, Check, AlertCircle } from 'lucide-react';
 import type { Message } from '../types';
-import type { LoadingPhase } from '../context/useChat';
+import type { LoadingPhase, ToolInvocation } from '../context/useChat';
 
 interface Props {
   streamingContent: string;
   streamingReasoningContent: string;
   isStreaming: boolean;
   loadingPhase: LoadingPhase;
+  toolInvocations: ToolInvocation[];
   scrollRef: React.Ref<HTMLDivElement>;
   scrollContainerRef: React.Ref<HTMLDivElement>;
   onResendMessage?: (id: string) => void;
   onRegenerateMessage?: (id: string) => void;
   onDeleteMessage?: (id: string) => void;
+}
+
+function ToolInvocationRow({ inv }: { inv: ToolInvocation }) {
+  const [expanded, setExpanded] = useState(false);
+
+  let prettyArgs = inv.arguments;
+  try {
+    prettyArgs = JSON.stringify(JSON.parse(inv.arguments), null, 2);
+  } catch {
+    // leave as-is if not valid JSON
+  }
+
+  const statusIcon =
+    inv.status === 'running' ? (
+      <Loader2 className="w-3.5 h-3.5 animate-spin theme-text-muted" />
+    ) : inv.status === 'error' ? (
+      <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+    ) : (
+      <Check className="w-3.5 h-3.5 text-green-400" />
+    );
+
+  const statusLabel =
+    inv.status === 'running'
+      ? 'Running…'
+      : inv.status === 'error'
+        ? 'Error'
+        : inv.durationMs != null
+          ? `${(inv.durationMs / 1000).toFixed(2)}s`
+          : 'Done';
+
+  return (
+    <div className="mb-2 border theme-border rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:theme-sidebar-hover transition-colors"
+      >
+        <Wrench className="w-3.5 h-3.5 theme-text-muted flex-shrink-0" />
+        <span className="text-xs font-mono theme-text-primary">{inv.name}</span>
+        <span className="text-xs theme-text-muted flex-1 truncate">
+          {inv.arguments.length > 80 ? inv.arguments.slice(0, 80) + '…' : inv.arguments}
+        </span>
+        {statusIcon}
+        <span className="text-[10px] theme-text-muted font-mono">{statusLabel}</span>
+        {expanded ? (
+          <ChevronUp className="w-3.5 h-3.5 theme-text-muted" />
+        ) : (
+          <ChevronDown className="w-3.5 h-3.5 theme-text-muted" />
+        )}
+      </button>
+      {expanded && (
+        <div className="px-3 py-2 border-t theme-border text-xs theme-text">
+          <div className="theme-text-muted uppercase tracking-wide text-[10px] mb-1">Arguments</div>
+          <pre className="whitespace-pre-wrap font-mono theme-text-secondary mb-3 max-h-40 overflow-auto">{prettyArgs}</pre>
+          {(inv.result || inv.error) && (
+            <>
+              <div className="theme-text-muted uppercase tracking-wide text-[10px] mb-1">
+                {inv.error ? 'Error' : 'Result'}
+              </div>
+              <pre className="whitespace-pre-wrap font-mono theme-text-secondary max-h-60 overflow-auto">
+                {inv.error || inv.result}
+              </pre>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function CopyButton({ code }: { code: string }) {
@@ -284,6 +353,13 @@ const MessageBubble = memo(function MessageBubble({
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
           <>
+            {message.tool_invocations && message.tool_invocations.length > 0 && (
+              <div className="mb-3">
+                {message.tool_invocations.map((inv) => (
+                  <ToolInvocationRow key={inv.id} inv={inv} />
+                ))}
+              </div>
+            )}
             {message.reasoning && <ReasoningBlock reasoning={message.reasoning} />}
             <MessageContent content={message.content} />
           </>
@@ -386,7 +462,7 @@ function LoadingIndicator({
   );
 }
 
-export default function ChatArea({ streamingContent, streamingReasoningContent, isStreaming, loadingPhase, scrollRef, scrollContainerRef, onResendMessage, onRegenerateMessage, onDeleteMessage }: Props) {
+export default function ChatArea({ streamingContent, streamingReasoningContent, isStreaming, loadingPhase, toolInvocations, scrollRef, scrollContainerRef, onResendMessage, onRegenerateMessage, onDeleteMessage }: Props) {
   const {
     activeConversationId,
     messages,
@@ -503,6 +579,14 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
               onDelete={onDeleteMessage}
             />
           ))}
+
+          {toolInvocations.length > 0 && (
+            <div className="mb-4">
+              {toolInvocations.map((inv) => (
+                <ToolInvocationRow key={inv.id} inv={inv} />
+              ))}
+            </div>
+          )}
 
           {streamingContent && (
             <div className="flex justify-start mb-4">

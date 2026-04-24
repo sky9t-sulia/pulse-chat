@@ -687,6 +687,32 @@ function ChatTab() {
           ))}
         </div>
       </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-xs text-gray-400">Max tool calls per message</label>
+          <span className="text-xs theme-text-secondary font-mono">
+            {chatSettings.max_calls_per_tool}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={1}
+          max={10}
+          step={1}
+          value={chatSettings.max_calls_per_tool}
+          onChange={(e) =>
+            setChatSettings({
+              ...chatSettings,
+              max_calls_per_tool: Number(e.target.value),
+            })
+          }
+          className="w-full accent-gray-500"
+        />
+        <p className="text-xs theme-text-muted mt-1">
+          How many times the model can call the same tool in one turn before it's asked to answer with what it has.
+        </p>
+      </div>
     </div>
   );
 }
@@ -846,15 +872,18 @@ function ToolsTab() {
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
+                  type="button"
+                  role="switch"
+                  aria-checked={tool.enabled}
                   onClick={() => handleToggle(tool)}
-                  className={`w-8 h-4 rounded-full transition-colors relative ${
-                    tool.enabled ? 'bg-[var(--accent)]' : 'theme-input border theme-border-light'
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                    tool.enabled ? 'bg-[var(--accent)]' : 'bg-gray-600/40'
                   }`}
                   title={tool.enabled ? 'Disable' : 'Enable'}
                 >
-                  <div
-                    className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform ${
-                      tool.enabled ? 'translate-x-4' : 'translate-x-0.5'
+                  <span
+                    className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${
+                      tool.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
                     }`}
                   />
                 </button>

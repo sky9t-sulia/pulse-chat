@@ -15,6 +15,16 @@ export interface TokenStats {
   tokens_per_second?: number;
 }
 
+export interface ToolInvocation {
+  id: string;
+  name: string;
+  arguments: string;
+  status: 'running' | 'done' | 'error';
+  result?: string;
+  error?: string;
+  durationMs?: number;
+}
+
 // Hidden base system prompt — prepended to the user-provided system prompt.
 // Tells the model how to format output so it renders correctly in the UI.
 const BASE_SYSTEM_PROMPT = [
@@ -127,6 +137,7 @@ export function useChat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>({ kind: 'idle' });
   const [tokenStats, setTokenStats] = useState<TokenStats | null>(null);
+  const [toolInvocations, setToolInvocations] = useState<ToolInvocation[]>([]);
   const cancelRef = useRef<(() => void) | null>(null);
   const messagesRef = useRef(messages);
   const responseIdRef = useRef<Record<string, string>>({});
@@ -188,6 +199,10 @@ export function useChat() {
       setLoadingPhase({ kind: 'waiting' });
       setStreamingContent('');
       setStreamingReasoningContent('');
+      setToolInvocations([]);
+      const collectedInvocations: ToolInvocation[] = [];
+      const toolCallCounts: Record<string, number> = {};
+      const maxCallsPerTool = Math.max(1, chatSettings.max_calls_per_tool || 3);
 
       let accumulatedContent = '';
       let accumulatedReasoningContent = '';
@@ -508,19 +523,46 @@ export function useChat() {
 
         // Execute each tool call and append its result
         for (const tc of loopResult.toolCalls) {
+          const toolName = tc.function.name;
+          const count = (toolCallCounts[toolName] || 0) + 1;
+          toolCallCounts[toolName] = count;
+
+          const runningEntry: ToolInvocation = {
+            id: tc.id,
+            name: toolName,
+            arguments: tc.function.arguments,
+            status: 'running',
+          };
+          collectedInvocations.push(runningEntry);
+          setToolInvocations([...collectedInvocations]);
+
+          const startedAt = Date.now();
           let toolResultContent = '';
           let toolError: string | undefined;
-          try {
-            const toolRes = await executeTool(tc.function.name, tc.function.arguments);
-            toolResultContent = toolRes.content;
-            toolError = toolRes.error;
-          } catch (err: unknown) {
-            toolError = err instanceof Error ? err.message : String(err);
+
+          if (count > maxCallsPerTool) {
+            toolError = `Tool '${toolName}' call limit reached (${maxCallsPerTool} per message). Answer the user with what you already have.`;
+          } else {
+            try {
+              const toolRes = await executeTool(toolName, tc.function.arguments);
+              toolResultContent = toolRes.content;
+              toolError = toolRes.error;
+            } catch (err: unknown) {
+              toolError = err instanceof Error ? err.message : String(err);
+            }
           }
+
+          const durationMs = Date.now() - startedAt;
+          runningEntry.status = toolError ? 'error' : 'done';
+          runningEntry.result = toolResultContent;
+          runningEntry.error = toolError;
+          runningEntry.durationMs = durationMs;
+          setToolInvocations([...collectedInvocations]);
+
           loopMessages.push({
             role: 'tool',
             tool_call_id: tc.id,
-            name: tc.function.name,
+            name: toolName,
             content: toolError ? `[Error: ${toolError}]\n${toolResultContent}` : toolResultContent,
           });
         }
@@ -560,11 +602,13 @@ export function useChat() {
           finalStats?.input_tokens,
           finalStats?.total_output_tokens,
           finalStats?.reasoning_output_tokens,
-          durationMs
+          durationMs,
+          collectedInvocations.length > 0 ? collectedInvocations : null
         );
 
         setStreamingContent('');
         setStreamingReasoningContent('');
+        setToolInvocations([]);
         setIsStreaming(false);
         setLoadingPhase({ kind: 'idle' });
 
@@ -579,10 +623,11 @@ export function useChat() {
 
       setStreamingContent('');
       setStreamingReasoningContent('');
+      setToolInvocations([]);
       setIsStreaming(false);
       setLoadingPhase({ kind: 'idle' });
     },
-    [activeConversationId, isStreaming, addMessage, chatSettings.system_prompt, updateConversationTitle, toolDefinitions, executeTool]
+    [activeConversationId, isStreaming, addMessage, chatSettings.system_prompt, chatSettings.max_calls_per_tool, updateConversationTitle, toolDefinitions, executeTool]
   );
 
   const stop = useCallback(() => {
@@ -643,6 +688,7 @@ export function useChat() {
     isStreaming,
     loadingPhase,
     tokenStats,
+    toolInvocations,
     scrollRef,
     scrollContainerRef,
     send,

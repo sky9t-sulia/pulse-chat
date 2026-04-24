@@ -15,6 +15,16 @@ interface Conversation {
   updated_at: number;
 }
 
+interface ToolInvocationRecord {
+  id: string;
+  name: string;
+  arguments: string;
+  status: 'running' | 'done' | 'error';
+  result?: string;
+  error?: string;
+  durationMs?: number;
+}
+
 interface Message {
   id: string;
   conversation_id: string;
@@ -27,6 +37,7 @@ interface Message {
   output_tokens?: number;
   reasoning_tokens?: number;
   duration_ms?: number;
+  tool_invocations?: ToolInvocationRecord[] | null;
 }
 
 interface Provider {
@@ -77,7 +88,8 @@ interface ChatAPI {
       inputTokens?: number,
       outputTokens?: number,
       reasoningTokens?: number,
-      durationMs?: number
+      durationMs?: number,
+      toolInvocations?: ToolInvocationRecord[] | null
     ) => Promise<Message>;
     delete: (conversationId: string) => Promise<void>;
     deleteOne: (id: string) => Promise<void>;
