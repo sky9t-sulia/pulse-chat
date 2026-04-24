@@ -9,14 +9,14 @@ export default defineConfig({
     {
       name: 'inject-html-env',
       transformIndexHtml(html) {
-        return html.replace('__PACKAGE_NAME__', packageJson.name);
+        return html.replace('__PACKAGE_NAME__', packageJson.displayName || packageJson.name);
       },
     },
   ],
   base: './',
   define: {
     'import.meta.env.PACKAGE_VERSION': JSON.stringify(packageJson.version),
-    'import.meta.env.PACKAGE_NAME': JSON.stringify(packageJson.name),
+    'import.meta.env.PACKAGE_NAME': JSON.stringify(packageJson.displayName || packageJson.name),
   },
   build: {
     outDir: 'dist',
