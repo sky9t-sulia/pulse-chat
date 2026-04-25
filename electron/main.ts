@@ -238,7 +238,7 @@ function saveDb() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200,
+    width: 1300,
     height: 800,
     minWidth: 1024,
     minHeight: 600,
