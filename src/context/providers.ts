@@ -1,4 +1,4 @@
-import type { ModelInfo } from '../types';
+import type { ModelInfo } from '../types/types';
 
 export interface ParsedModelList {
   models: string[];
@@ -25,7 +25,7 @@ const openaiStrategy: ProviderStrategy = {
     return { models, modelObjects };
   },
   extractModelInfo: (modelObj) => {
-    const id = modelObj.id as string;
+    const id = (modelObj.id as string) || (modelObj.key as string);
     const info: ModelInfo = {
       key: id,
       display_name: (modelObj.name as string) || id,

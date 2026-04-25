@@ -50,11 +50,6 @@ interface ModelInfo {
   format?: string;
   quantization?: { name: string; bits_per_weight: number };
   loaded?: boolean;
-  capabilities?: {
-    vision?: boolean;
-    trained_for_tool_use?: boolean;
-    reasoning?: { allowed_options: string[]; default: string };
-  };
 }
 
 interface Tool {

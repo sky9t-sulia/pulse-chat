@@ -1,62 +1,12 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import type { Conversation, Message, Provider, ThemeMode, ChatSettings, ChatFontFamily, ToolInvocationRecord } from '../types';
+import type { Conversation, Message, Provider, ToolInvocationRecord } from '../types/types';
+import { getFullChatUrl } from '../helpers/url';
+import { useSettings } from '../hooks/useSettings';
+import { useConversations } from '../hooks/useConversations';
+import { useMessages } from '../hooks/useMessages';
+import { useProviders } from '../hooks/useProviders';
 
-export const CHAT_FONT_STACKS: Record<ChatFontFamily, string> = {
-  system: `Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`,
-  sans: `Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
-  serif: `'Noto Serif', Georgia, Cambria, 'Times New Roman', Times, serif`,
-  mono: `'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace`,
-  inter: `Inter, system-ui, -apple-system, sans-serif`,
-};
-
-export const CHAT_FONT_SIZE_STEPS = [12, 13, 14, 15, 16, 17, 18, 19, 20] as const;
-
-const DEFAULT_CHAT_SETTINGS: ChatSettings = {
-  system_prompt: '',
-  font_family: 'system',
-  font_size: 16,
-  max_calls_per_tool: 3,
-};
-
-function loadChatSettings(): ChatSettings {
-  try {
-    const raw = localStorage.getItem('chat-settings');
-    if (!raw) return DEFAULT_CHAT_SETTINGS;
-    const parsed = JSON.parse(raw);
-    return {
-      system_prompt: typeof parsed.system_prompt === 'string' ? parsed.system_prompt : '',
-      font_family:
-        parsed.font_family === 'inter'
-          ? 'sans'
-          : CHAT_FONT_STACKS[parsed.font_family as ChatFontFamily]
-            ? (parsed.font_family as ChatFontFamily)
-            : 'system',
-      font_size:
-        typeof parsed.font_size === 'number' &&
-        (CHAT_FONT_SIZE_STEPS as readonly number[]).includes(parsed.font_size)
-          ? parsed.font_size
-          : 16,
-      max_calls_per_tool:
-        typeof parsed.max_calls_per_tool === 'number' &&
-        parsed.max_calls_per_tool >= 1 &&
-        parsed.max_calls_per_tool <= 20
-          ? Math.floor(parsed.max_calls_per_tool)
-          : 3,
-    };
-  } catch {
-    return DEFAULT_CHAT_SETTINGS;
-  }
-}
-
-export const DEFAULT_ENDPOINTS: Record<Provider['api_type'], readonly string[]> = {
-  openai: ['/v1/chat/completions'],
-};
-
-export function getFullChatUrl(provider: Provider): string {
-  const base = provider.api_url.replace(/\/+$/, '');
-  const endpoint = provider.endpoint.replace(/^\/+/, '');
-  return `${base}/${endpoint}`;
-}
+export { getFullChatUrl };
 
 interface AppContextType {
   conversations: Conversation[];
@@ -66,10 +16,10 @@ interface AppContextType {
   activeProvider: Provider | null;
   activeModel: string;
   setActiveModel: (modelKey: string) => void;
-  theme: ThemeMode;
-  setTheme: (theme: ThemeMode) => void;
-  chatSettings: ChatSettings;
-  setChatSettings: (settings: ChatSettings) => void;
+  theme: 'dark' | 'light';
+  setTheme: (theme: 'dark' | 'light') => void;
+  chatSettings: import('../types/types').ChatSettings;
+  setChatSettings: (settings: import('../types/types').ChatSettings) => void;
   setActiveProvider: (provider: Provider | null) => void;
   setActiveConversationId: (id: string | null) => void;
   refreshConversations: () => Promise<void>;
@@ -113,10 +63,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeProvider, setActiveProviderState] = useState<Provider | null>(null);
   const [activeModel, setActiveModel] = useState<string>('');
 
+  const { theme, setTheme, chatSettings, setChatSettings } = useSettings();
+
   const setActiveProvider = useCallback((p: Provider | null) => {
     setActiveProviderState(p);
-    // Reset the active model to the provider's default (or first enabled model)
-    // whenever the provider changes, so we never leave a stale model selected.
     if (p) {
       const firstEnabled = p.models?.find((m) => m.enabled !== false)?.key;
       setActiveModel(p.default_model || firstEnabled || '');
@@ -126,183 +76,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('active-provider-id');
     }
   }, []);
-  const [theme, setThemeState] = useState<ThemeMode>(() => {
-    const saved = localStorage.getItem('chat-theme');
-    return (saved as ThemeMode) || 'dark';
-  });
-  const [chatSettings, setChatSettingsState] = useState<ChatSettings>(loadChatSettings);
 
-  useEffect(() => {
-    localStorage.setItem('chat-theme', theme);
-    if (theme === 'light') {
-      document.documentElement.classList.add('light');
-    } else {
-      document.documentElement.classList.remove('light');
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    localStorage.setItem('chat-settings', JSON.stringify(chatSettings));
-    const root = document.documentElement;
-    root.style.setProperty('--chat-font-family', CHAT_FONT_STACKS[chatSettings.font_family]);
-    root.style.setProperty('--chat-font-size', `${chatSettings.font_size}px`);
-  }, [chatSettings]);
-
-  const setTheme = useCallback((t: ThemeMode) => {
-    setThemeState(t);
-  }, []);
-
-  const setChatSettings = useCallback((s: ChatSettings) => {
-    setChatSettingsState(s);
-  }, []);
-
-  const refreshConversations = useCallback(async () => {
-    const list = await window.chatApi.conversations.list();
-    setConversations(list);
-  }, []);
-
-  const refreshMessages = useCallback(async () => {
-    if (!activeConversationId) {
-      setMessages([]);
-      return;
-    }
-    const list = await window.chatApi.messages.get(activeConversationId);
-    setMessages(list as Message[]);
-  }, [activeConversationId]);
-
-  const refreshProviders = useCallback(async () => {
-    const list = await window.chatApi.providers.list();
-    // Backward compatibility: ensure all providers have a models array
-    // and that every model has model_info with max_context_length
-    const normalized = list.map((p) => ({
-      ...p,
-      models: (p.models ?? (p.model_info ? [{ key: p.default_model, model_info: p.model_info }] : [])).map((m: any) => {
-        const info = m.model_info ?? {};
-        // If model_info is missing max_context_length, try to get it from the model object itself
-        const maxCtx = info.max_context_length ?? (m.max_context_length as number);
-        return {
-          ...m,
-          model_info: maxCtx ? { ...info, max_context_length: maxCtx } : info,
-        };
-      }),
-    }));
-    setProviders(normalized);
-    if (normalized.length > 0 && !activeProvider) {
-      const savedId = localStorage.getItem('active-provider-id');
-      const restored = savedId ? normalized.find((p) => p.id === savedId) : null;
-      setActiveProvider(restored ?? normalized[0]);
-    }
-  }, [activeProvider, setActiveProvider]);
-
-  const createConversation = useCallback(
-    async (title: string) => {
-      const conv = await window.chatApi.conversations.create(title);
-      await refreshConversations();
-      return conv;
-    },
-    [refreshConversations]
+  const { refreshConversations, refreshMessages, createConversation, deleteConversation, updateConversationTitle } = useConversations(
+    setConversations,
+    setMessages,
+    setActiveConversationId,
   );
 
-  const deleteConversation = useCallback(
-    async (id: string) => {
-      await window.chatApi.conversations.delete(id);
-      await refreshConversations();
-      if (activeConversationId === id) {
-        setActiveConversationId(null);
-        setMessages([]);
-      }
-    },
-    [refreshConversations, activeConversationId]
+  const { addMessage, deleteMessages, deleteMessage } = useMessages(setMessages);
+
+  const { refreshProviders, addProvider, updateProvider, deleteProvider } = useProviders(
+    setProviders,
+    activeProvider,
+    setActiveProvider,
   );
 
-  const updateConversationTitle = useCallback(
-    async (id: string, title: string) => {
-      await window.chatApi.conversations.updateTitle(id, title);
-      await refreshConversations();
-    },
-    [refreshConversations]
-  );
-
-  const addMessage = useCallback(
-    async (
-      conversationId: string,
-      role: 'user' | 'assistant',
-      content: string,
-      model?: string,
-      reasoning?: string,
-      inputTokens?: number,
-      outputTokens?: number,
-      reasoningTokens?: number,
-      durationMs?: number,
-      toolInvocations?: ToolInvocationRecord[] | null
-    ) => {
-      const msg = await window.chatApi.messages.add(
-        conversationId,
-        role,
-        content,
-        model,
-        reasoning,
-        inputTokens,
-        outputTokens,
-        reasoningTokens,
-        durationMs,
-        toolInvocations
-      );
-      setMessages((prev) => [...prev, msg as Message]);
-      return msg as Message;
-    },
-    []
-  );
-
-  const deleteMessages = useCallback(async (conversationId: string) => {
-    await window.chatApi.messages.delete(conversationId);
-    setMessages([]);
-  }, []);
-
-  const deleteMessage = useCallback(async (id: string) => {
-    await window.chatApi.messages.deleteOne(id);
-    setMessages((prev) => prev.filter((m) => m.id !== id));
-  }, []);
-
-  const addProvider = useCallback(
-    async (provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => {
-      const newProvider = await window.chatApi.providers.create({
-        ...provider,
-        api_type: provider.api_type ?? 'openai',
-        endpoint: provider.endpoint ?? '/v1/chat/completions',
-        models: provider.models ?? [],
-      });
-      await refreshProviders();
-      return newProvider;
-    },
-    [refreshProviders]
-  );
-
-  const updateProvider = useCallback(
-    async (id: string, provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => {
-      await window.chatApi.providers.update(id, {
-        ...provider,
-        api_type: provider.api_type ?? 'openai',
-        endpoint: provider.endpoint ?? '/v1/chat/completions',
-        models: provider.models ?? [],
-      });
-      await refreshProviders();
-    },
-    [refreshProviders]
-  );
-
-  const deleteProvider = useCallback(
-    async (id: string) => {
-      await window.chatApi.providers.delete(id);
-      await refreshProviders();
-      if (activeProvider?.id === id) {
-        setActiveProvider(null);
-      }
-    },
-    [refreshProviders, activeProvider]
-  );
-
-  // Auto-select first conversation on load
   useEffect(() => {
     refreshConversations();
     refreshProviders();
@@ -327,7 +115,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setActiveProvider,
     setActiveConversationId,
     refreshConversations,
-    refreshMessages,
+    refreshMessages: () => refreshMessages(activeConversationId),
     refreshProviders,
     createConversation,
     deleteConversation,

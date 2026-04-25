@@ -1,10 +1,10 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useApp } from './context/AppContext';
-import { useChat } from './context/useChat';
-import Sidebar from './components/Sidebar';
-import ChatArea from './components/ChatArea';
-import ChatInput from './components/ChatInput';
-import type { Provider } from './types';
+import { useChat } from './hooks/useChat';
+import Sidebar from './components/Sidebar/Sidebar';
+import ChatArea from './components/ChatArea/ChatArea';
+import ChatInput from './components/ChatInput/ChatInput';
+import type { Provider } from './types/types';
 
 function ChatContainer() {
   const { streamingContent, streamingReasoningContent, isStreaming, loadingPhase, tokenStats, toolInvocations, scrollRef, scrollContainerRef, send, stop, resendMessage, regenerateMessage } = useChat();

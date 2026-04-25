@@ -291,8 +291,7 @@ body {
   background: var(--modal-bg);
   border-radius: 12px;
   padding: 24px;
-  min-width: 480px;
-  max-width: 90vw;
+  width: 640px;
   max-height: 80vh;
   overflow-y: auto;
 }

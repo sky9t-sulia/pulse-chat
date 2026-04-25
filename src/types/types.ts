@@ -59,11 +59,6 @@ export interface ModelInfo {
   format?: string;
   quantization?: { name: string; bits_per_weight: number };
   loaded?: boolean;
-  capabilities?: {
-    vision?: boolean;
-    trained_for_tool_use?: boolean;
-    reasoning?: { allowed_options: string[]; default: string };
-  };
 }
 
 export interface ChatSession {
@@ -108,4 +103,45 @@ export interface ToolResult {
   content: string;
   error?: string;
   duration_ms: number;
+}
+
+export interface ChatAPI {
+  conversations: {
+    list: () => Promise<Conversation[]>;
+    create: (title: string) => Promise<Conversation>;
+    delete: (id: string) => Promise<void>;
+    get: (id: string) => Promise<Conversation | undefined>;
+    updateTitle: (id: string, title: string) => Promise<void>;
+  };
+  messages: {
+    get: (conversationId: string) => Promise<Message[]>;
+    add: (
+      conversationId: string,
+      role: string,
+      content: string,
+      model?: string,
+      reasoning?: string,
+      inputTokens?: number,
+      outputTokens?: number,
+      reasoningTokens?: number,
+      durationMs?: number,
+      toolInvocations?: ToolInvocationRecord[] | null
+    ) => Promise<Message>;
+    delete: (conversationId: string) => Promise<void>;
+    deleteOne: (id: string) => Promise<void>;
+  };
+  providers: {
+    list: () => Promise<Provider[]>;
+    create: (provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => Promise<Provider>;
+    update: (id: string, provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => Promise<Provider>;
+    delete: (id: string) => Promise<void>;
+    get: (id: string) => Promise<Provider | undefined>;
+  };
+  tools: {
+    list: () => Promise<Tool[]>;
+    create: (tool: Omit<Tool, 'id' | 'created_at' | 'updated_at'>) => Promise<Tool>;
+    update: (id: string, tool: Partial<Omit<Tool, 'id' | 'created_at' | 'updated_at'>>) => Promise<void>;
+    delete: (id: string) => Promise<void>;
+    execute: (toolName: string, toolArgsJson: string) => Promise<ToolResult>;
+  };
 }

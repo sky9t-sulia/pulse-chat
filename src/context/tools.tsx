@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import type { Tool } from '../types';
+import type { Tool } from '../types/types';
 
 interface ToolRegistryContextType {
   tools: Tool[];
