@@ -6,11 +6,13 @@ interface Props {
   name: string;
   description: string;
   parameters: string;
+  handlerCode: string;
   paramError?: string | null;
   readOnly?: boolean;
   onChangeName?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onChangeDescription?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onChangeParameters?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onChangeHandlerCode?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onSubmit?: (e: React.FormEvent) => void;
   onCancel: () => void;
   submitLabel?: string;
@@ -21,11 +23,13 @@ export function ToolsTabForm({
   name,
   description,
   parameters,
+  handlerCode,
   paramError,
   readOnly,
   onChangeName,
   onChangeDescription,
   onChangeParameters,
+  onChangeHandlerCode,
   onSubmit,
   onCancel,
   submitLabel = 'Save',
@@ -74,13 +78,26 @@ export function ToolsTabForm({
           <ThemedTextarea
             value={parameters}
             onChange={onChangeParameters}
-            placeholder={`{\n  "type": "object",\n  "properties": {\n    "query": { "type": "string", "description": "Search query" }\n  },\n  "required": ["query"]\n}`}
+            placeholder={`{\n  "type": "object",\n  "properties": {\n    "query": { "type": "string", "description": "Search query" }\n  },\n  "required": ["query"]\n}\n\nUse {"type": "object", "properties": {}} for no parameters.`}
             rows={6}
             className={`text-xs font-mono resize-none ${inputClass}`}
             required={!readOnly}
             readOnly={readOnly}
           />
           {paramError && <p className="text-xs text-red-400 mt-1">{paramError}</p>}
+        </div>
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">
+            Handler Code <span className="theme-text-muted">(optional — JS function)</span>
+          </label>
+          <ThemedTextarea
+            value={handlerCode}
+            onChange={onChangeHandlerCode}
+            placeholder={`// This code runs as the function body — 'args' is available.\n// You can define helper functions at the top level.\n\nfunction formatISO(d) {\n  return d.toISOString();\n}\n\nreturn JSON.stringify({ date: formatISO(new Date()) });`}
+            rows={6}
+            className={`text-xs font-mono resize-none ${inputClass}`}
+            readOnly={readOnly}
+          />
         </div>
         <div className="flex justify-end gap-2">
           <button

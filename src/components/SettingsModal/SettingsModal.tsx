@@ -8,7 +8,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<'providers' | 'tools' | 'chat'>('providers');
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium theme-text-heading">Settings</h2>

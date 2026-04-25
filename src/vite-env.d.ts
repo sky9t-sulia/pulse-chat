@@ -110,6 +110,7 @@ interface Tool {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
+  handler_code: string;
   enabled: boolean;
   is_built_in: boolean;
   created_at: number;

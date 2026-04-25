@@ -19,15 +19,25 @@ export function useToolRegistry() {
   return ctx;
 }
 
+function normalizeParameters(params: unknown): Record<string, unknown> {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+    return { type: 'object', properties: {}, required: [] };
+  }
+  const p = params as Record<string, unknown>;
+  if (p.type !== 'object') {
+    return { ...p, type: 'object' };
+  }
+  return { ...p, properties: p.properties || {}, required: p.required || [] };
+}
+
 function convertToolToDefinition(tool: Tool): unknown {
   // Convert our Tool format to OpenAI-compatible tool definition
-  const params = tool.parameters as { type?: string; properties?: Record<string, unknown>; required?: string[] };
   return {
     type: 'function',
     function: {
       name: tool.name,
       description: tool.description,
-      parameters: params || { type: 'object', properties: {}, required: [] },
+      parameters: normalizeParameters(tool.parameters as Record<string, unknown>),
     },
   };
 }

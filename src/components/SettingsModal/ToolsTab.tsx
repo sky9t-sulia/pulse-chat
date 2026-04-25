@@ -12,12 +12,14 @@ export function ToolsTab() {
   const [addName, setAddName] = useState('');
   const [addDescription, setAddDescription] = useState('');
   const [addParameters, setAddParameters] = useState('{}');
+  const [addHandlerCode, setAddHandlerCode] = useState('');
   const [addParamError, setAddParamError] = useState<string | null>(null);
 
   const openAdd = () => {
     setAddName('');
     setAddDescription('');
     setAddParameters('{}');
+    setAddHandlerCode('');
     setAddParamError(null);
     setShowAdd(true);
   };
@@ -32,7 +34,14 @@ export function ToolsTab() {
       setAddParamError('Invalid JSON in parameters');
       return;
     }
-    addTool({ name: addName, description: addDescription, parameters: parsed as Record<string, unknown>, enabled: true, is_built_in: false });
+    // Ensure parameters always has type: "object" for API compatibility
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      (parsed as Record<string, unknown>).type = (parsed as Record<string, unknown>).type || 'object';
+    } else {
+      setAddParamError('Parameters must be a JSON object with type: "object"');
+      return;
+    }
+    addTool({ name: addName, description: addDescription, parameters: parsed as Record<string, unknown>, handler_code: addHandlerCode, enabled: true, is_built_in: false });
     setShowAdd(false);
   };
 
@@ -73,10 +82,12 @@ export function ToolsTab() {
             name={addName}
             description={addDescription}
             parameters={addParameters}
+            handlerCode={addHandlerCode}
             paramError={addParamError}
             onChangeName={(e) => setAddName(e.target.value)}
             onChangeDescription={(e) => setAddDescription(e.target.value)}
             onChangeParameters={(e) => { setAddParameters(e.target.value); setAddParamError(null); }}
+            onChangeHandlerCode={(e) => setAddHandlerCode(e.target.value)}
             onSubmit={handleAdd}
             onCancel={() => setShowAdd(false)}
             submitLabel="Add"
@@ -117,12 +128,14 @@ function InlineToolItem({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [parameters, setParameters] = useState('');
+  const [handlerCode, setHandlerCode] = useState('');
   const [paramError, setParamError] = useState<string | null>(null);
 
   const startEdit = () => {
     setName(tool.name);
     setDescription(tool.description);
     setParameters(JSON.stringify(tool.parameters, null, 2));
+    setHandlerCode(tool.handler_code || '');
     setParamError(null);
     changeMode('edit');
   };
@@ -142,7 +155,14 @@ function InlineToolItem({
       setParamError('Invalid JSON in parameters');
       return;
     }
-    onUpdate({ name, description, parameters: parsed as Record<string, unknown> });
+    // Ensure parameters always has type: "object" for API compatibility
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      (parsed as Record<string, unknown>).type = (parsed as Record<string, unknown>).type || 'object';
+    } else {
+      setParamError('Parameters must be a JSON object with type: "object"');
+      return;
+    }
+    onUpdate({ name, description, parameters: parsed as Record<string, unknown>, handler_code: handlerCode });
     changeMode('row');
   };
 
@@ -154,11 +174,13 @@ function InlineToolItem({
         name={readOnly ? tool.name : name}
         description={readOnly ? tool.description : description}
         parameters={readOnly ? JSON.stringify(tool.parameters, null, 2) : parameters}
+        handlerCode={readOnly ? (tool.handler_code || '') : handlerCode}
         paramError={paramError}
         readOnly={readOnly}
         onChangeName={(e) => setName(e.target.value)}
         onChangeDescription={(e) => setDescription(e.target.value)}
         onChangeParameters={(e) => { setParameters(e.target.value); setParamError(null); }}
+        onChangeHandlerCode={(e) => setHandlerCode(e.target.value)}
         onSubmit={readOnly ? undefined : handleSubmit}
         onCancel={cancel}
         submitLabel="Update"

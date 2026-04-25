@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import path from 'path';
 import initSqlJs, { type SqlJsStatic, type Database } from 'sql.js';
 import { v4 as uuidv4 } from 'uuid';
+import { builtInHandlers } from './builtInTools';
 
 let mainWindow: BrowserWindow | null = null;
 let db: Database | null = null;
@@ -58,6 +59,7 @@ async function initDatabase() {
       name TEXT NOT NULL UNIQUE,
       description TEXT NOT NULL,
       parameters TEXT NOT NULL DEFAULT '{}',
+      handler_code TEXT NOT NULL DEFAULT '',
       enabled INTEGER NOT NULL DEFAULT 1,
       is_built_in INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -127,6 +129,13 @@ async function initDatabase() {
   // Migration: add tool_invocations column (JSON) if it doesn't exist yet
   try {
     db.run(`ALTER TABLE messages ADD COLUMN tool_invocations TEXT`);
+  } catch {
+    // Column already exists or migration not needed
+  }
+
+  // Migration: add handler_code column to tools if it doesn't exist yet
+  try {
+    db.run(`ALTER TABLE tools ADD COLUMN handler_code TEXT NOT NULL DEFAULT ''`);
   } catch {
     // Column already exists or migration not needed
   }
@@ -521,6 +530,7 @@ ipcMain.handle('tools:list', () => {
     name: row.name,
     description: row.description,
     parameters: typeof row.parameters === 'string' ? JSON.parse(row.parameters) : row.parameters,
+    handler_code: row.handler_code || '',
     enabled: row.enabled === 1,
     is_built_in: row.is_built_in === 1,
     created_at: row.created_at,
@@ -530,16 +540,17 @@ ipcMain.handle('tools:list', () => {
 
 ipcMain.handle(
   'tools:create',
-  (_e, tool: { name: string; description: string; parameters: Record<string, unknown>; enabled?: boolean }) => {
+  (_e, tool: { name: string; description: string; parameters: Record<string, unknown>; handler_code?: string; enabled?: boolean }) => {
     const id = uuidv4();
     const now = Date.now();
     run(
-      'INSERT INTO tools (id, name, description, parameters, enabled, is_built_in, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO tools (id, name, description, parameters, handler_code, enabled, is_built_in, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         id,
         tool.name,
         tool.description,
         JSON.stringify(tool.parameters),
+        tool.handler_code || '',
         tool.enabled !== false ? 1 : 0,
         0,
         now,
@@ -552,6 +563,7 @@ ipcMain.handle(
       name: tool.name,
       description: tool.description,
       parameters: tool.parameters,
+      handler_code: tool.handler_code || '',
       enabled: tool.enabled !== false,
       is_built_in: false,
       created_at: now,
@@ -562,12 +574,13 @@ ipcMain.handle(
 
 ipcMain.handle(
   'tools:update',
-  (_e, id: string, tool: { name?: string; description?: string; parameters?: Record<string, unknown>; enabled?: boolean }) => {
+  (_e, id: string, tool: { name?: string; description?: string; parameters?: Record<string, unknown>; handler_code?: string; enabled?: boolean }) => {
     const sets: string[] = [];
     const params: any[] = [];
     if (tool.name !== undefined) { sets.push('name = ?'); params.push(tool.name); }
     if (tool.description !== undefined) { sets.push('description = ?'); params.push(tool.description); }
     if (tool.parameters !== undefined) { sets.push('parameters = ?'); params.push(JSON.stringify(tool.parameters)); }
+    if (tool.handler_code !== undefined) { sets.push('handler_code = ?'); params.push(tool.handler_code); }
     if (tool.enabled !== undefined) { sets.push('enabled = ?'); params.push(tool.enabled ? 1 : 0); }
     sets.push('updated_at = ?');
     params.push(Date.now());
@@ -589,168 +602,27 @@ ipcMain.handle('tools:delete', (_e, id: string) => {
 ipcMain.handle('tools:execute', async (_e, toolName: string, toolArgsJson: string) => {
   const startTime = Date.now();
 
-  // Built-in tools registry
-  const builtInHandlers: Record<string, (args: any) => Promise<{ content: string; error?: string }>> = {
-    web_search: async (args: { query: string }) => {
-      // DDG's html endpoint returns a 202 challenge page unless we POST with
-      // proper browser-like headers (Referer in particular).
-      const decodeHtml = (s: string) =>
-        s
-          .replace(/<[^>]+>/g, '')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/&nbsp;/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+  // Check for custom handler code in the database
+  const toolRows = query<any>(`SELECT handler_code FROM tools WHERE name = ?`, [toolName]);
+  const customHandlerCode = toolRows.length > 0 ? toolRows[0].handler_code : '';
 
-      const unwrapDdgRedirect = (href: string): string => {
-        // DDG sometimes wraps outbound links as /l/?uddg=<encoded>
-        const m = href.match(/[?&]uddg=([^&]+)/);
-        if (m) {
-          try {
-            return decodeURIComponent(m[1]);
-          } catch {
-            return href;
-          }
-        }
-        if (href.startsWith('//')) return `https:${href}`;
-        return href;
+  if (customHandlerCode) {
+    try {
+      const args = JSON.parse(toolArgsJson);
+      // Create a sandboxed execution context: args is the only parameter
+      const executeHandler = new Function('args', customHandlerCode);
+      const result = await executeHandler(args);
+      const content = typeof result === 'string' ? result : JSON.stringify(result);
+      return {
+        content,
+        error: undefined,
+        duration_ms: Date.now() - startTime,
       };
-
-      try {
-        const res = await fetch('https://html.duckduckgo.com/html/', {
-          method: 'POST',
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            Referer: 'https://html.duckduckgo.com/',
-          },
-          body: new URLSearchParams({ q: args.query, kl: 'wt-wt' }).toString(),
-        });
-
-        if (!res.ok) {
-          return { content: '', error: `Search HTTP ${res.status}` };
-        }
-
-        const html = await res.text();
-
-        const results: Array<{ title: string; url: string; snippet: string }> = [];
-
-        // Each result row: <a class="result__a" href="…">TITLE</a> … <a class="result__snippet" href="…">SNIPPET</a>
-        const rowRegex =
-          /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-
-        let match: RegExpExecArray | null;
-        while ((match = rowRegex.exec(html)) !== null) {
-          const url = unwrapDdgRedirect(match[1]);
-          const title = decodeHtml(match[2]);
-          const snippet = decodeHtml(match[3]);
-          if (title && url) {
-            results.push({ title, url, snippet });
-            if (results.length >= 8) break;
-          }
-        }
-
-        const content =
-          results.length > 0
-            ? results.map((r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet}`).join('\n\n')
-            : 'No results found.';
-        return { content };
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { content: '', error: `Search failed: ${msg}` };
-      }
-    },
-    fetch_url: async (args: { url: string }) => {
-      const MAX_CHARS = 8000;
-      if (!args.url || typeof args.url !== 'string') {
-        return { content: '', error: 'url argument is required' };
-      }
-
-      let parsed: URL;
-      try {
-        parsed = new URL(args.url);
-      } catch {
-        return { content: '', error: `Invalid URL: ${args.url}` };
-      }
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        return { content: '', error: `Unsupported protocol: ${parsed.protocol}` };
-      }
-      // Block obvious SSRF targets on the local machine / private LAN
-      const host = parsed.hostname;
-      if (
-        host === 'localhost' ||
-        host === '127.0.0.1' ||
-        host === '0.0.0.0' ||
-        host === '::1' ||
-        /^10\./.test(host) ||
-        /^192\.168\./.test(host) ||
-        /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-        /^169\.254\./.test(host)
-      ) {
-        return { content: '', error: `Refusing to fetch internal/private address: ${host}` };
-      }
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
-      try {
-        const res = await fetch(parsed.toString(), {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5',
-            'Accept-Language': 'en-US,en;q=0.5',
-          },
-          redirect: 'follow',
-          signal: controller.signal,
-        });
-
-        if (!res.ok) {
-          return { content: '', error: `HTTP ${res.status} fetching ${args.url}` };
-        }
-
-        const contentType = res.headers.get('content-type') || '';
-        const raw = await res.text();
-
-        let text = raw;
-        if (contentType.includes('html') || /<html[\s>]/i.test(raw.slice(0, 500))) {
-          // Strip script/style blocks, then tags, then collapse whitespace
-          text = raw
-            .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-            .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-            .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
-            .replace(/<!--[\s\S]*?-->/g, ' ')
-            .replace(/<\/?(br|p|div|li|h[1-6]|tr|section|article)[^>]*>/gi, '\n')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&quot;/g, '"')
-            .replace(/&#39;/g, "'")
-            .replace(/&nbsp;/g, ' ')
-            .replace(/[ \t]+/g, ' ')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-        }
-
-        const truncated = text.length > MAX_CHARS;
-        if (truncated) text = text.slice(0, MAX_CHARS) + `\n\n[truncated — fetched ${raw.length} chars, showing first ${MAX_CHARS}]`;
-
-        return { content: `URL: ${parsed.toString()}\n\n${text}` };
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { content: '', error: `Fetch failed: ${msg}` };
-      } finally {
-        clearTimeout(timeout);
-      }
-    },
-  };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: '', error: `Custom handler error: ${msg}`, duration_ms: Date.now() - startTime };
+    }
+  }
 
   const handler = builtInHandlers[toolName];
   if (!handler) {
