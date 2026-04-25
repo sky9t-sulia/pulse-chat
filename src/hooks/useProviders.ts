@@ -20,7 +20,12 @@ export function useProviders(
       }),
     }));
     setProviders(normalized as Provider[]);
-  }, []);
+    const savedId = localStorage.getItem('active-provider-id');
+    if (savedId) {
+      const match = normalized.find((p) => p.id === savedId);
+      if (match) setActiveProvider(match as Provider);
+    }
+  }, [setActiveProvider]);
 
   const addProvider = useCallback(
     async (provider: Omit<Provider, 'id' | 'created_at' | 'updated_at'>) => {

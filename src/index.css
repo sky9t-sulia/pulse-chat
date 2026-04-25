@@ -8,6 +8,7 @@
   /* Dark theme (default) — warm charcoal, Claude-inspired */
   --bg-main: #262624;
   --bg-sidebar: #1f1f1c;
+  --bg-sidebar-transparent: #1f1f1c80;
   --bg-sidebar-hover: #2e2e2a;
   --bg-sidebar-active: #3a3a35;
   --bg-main-hover: #2d2d2a;
@@ -39,6 +40,7 @@
   /* Light theme — clean off-white, neutral */
   --bg-main: #f8f8f6;
   --bg-sidebar: #f0f0ee;
+  --bg-sidebar-transparent: #f0f0ee80;
   --bg-sidebar-hover: #e8e8e6;
   --bg-sidebar-active: #dcdcda;
   --bg-main-hover: #eeeeec;

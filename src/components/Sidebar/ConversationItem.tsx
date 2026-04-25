@@ -8,6 +8,7 @@ interface Props {
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
+  onCloseSettings?: () => void;
 }
 
 export function ConversationItem({
@@ -16,6 +17,7 @@ export function ConversationItem({
   onSelect,
   onDelete,
   onRename,
+  onCloseSettings,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(conversation.title);
@@ -44,10 +46,15 @@ export function ConversationItem({
 
   return (
     <div
-      className={`sidebar-item flex items-center gap-1 px-2 py-1.5 rounded-lg cursor-pointer group ${
+      className={`sidebar-item flex items-center gap-1 px-2 py-2 rounded-lg cursor-pointer group ${
         isActive ? 'theme-sidebar-active' : ''
       }`}
-      onClick={() => !editing && onSelect(conversation.id)}
+      onClick={() => {
+        if (!editing) {
+          onSelect(conversation.id);
+          onCloseSettings?.();
+        }
+      }}
     >
       <svg
         className="w-4 h-4 flex-shrink-0 theme-text-secondary"

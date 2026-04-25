@@ -13,7 +13,7 @@ export function ProvidersTab() {
     <div>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium theme-text-primary">
-          {showForm ? (editingProvider ? 'Edit Provider' : 'Add Provider') : 'Providers'}
+          {showForm ? (editingProvider ? 'Edit Provider' : 'Add Provider') : ''}
         </h3>
         {!showForm && (
           <button

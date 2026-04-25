@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Plus, Settings, Sun, Moon, PanelLeftClose, PanelLeft } from 'lucide-react';
-import SettingsModal from '../SettingsModal/SettingsModal';
 import { ConversationItem } from './ConversationItem';
 
 export default function Sidebar() {
@@ -14,9 +13,9 @@ export default function Sidebar() {
     createConversation,
     deleteConversation,
     updateConversationTitle,
+    setShowSettings,
   } = useApp();
 
-  const [showSettings, setShowSettings] = useState(false);
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem('sidebar-collapsed') === '1';
   });
@@ -28,6 +27,7 @@ export default function Sidebar() {
   const handleNewChat = async () => {
     const conv = await createConversation('New Chat');
     setActiveConversationId(conv.id);
+    setShowSettings(false);
   };
 
   return (
@@ -72,6 +72,7 @@ export default function Sidebar() {
               onSelect={setActiveConversationId}
               onDelete={deleteConversation}
               onRename={updateConversationTitle}
+              onCloseSettings={() => setShowSettings(false)}
             />
           ))}
         </div>
@@ -107,7 +108,6 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </aside>
   );
 }

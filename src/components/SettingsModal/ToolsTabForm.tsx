@@ -79,8 +79,8 @@ export function ToolsTabForm({
             value={parameters}
             onChange={onChangeParameters}
             placeholder={`{\n  "type": "object",\n  "properties": {\n    "query": { "type": "string", "description": "Search query" }\n  },\n  "required": ["query"]\n}\n\nUse {"type": "object", "properties": {}} for no parameters.`}
-            rows={6}
-            className={`text-xs font-mono resize-none ${inputClass}`}
+            rows={10}
+            className={`text-xs resize-y font-mono resize-none ${inputClass}`}
             required={!readOnly}
             readOnly={readOnly}
           />
@@ -94,8 +94,8 @@ export function ToolsTabForm({
             value={handlerCode}
             onChange={onChangeHandlerCode}
             placeholder={`// This code runs as the function body — 'args' is available.\n// You can define helper functions at the top level.\n\nfunction formatISO(d) {\n  return d.toISOString();\n}\n\nreturn JSON.stringify({ date: formatISO(new Date()) });`}
-            rows={6}
-            className={`text-xs font-mono resize-none ${inputClass}`}
+            rows={10}
+            className={`text-xs resize-y font-mono resize-none ${inputClass}`}
             readOnly={readOnly}
           />
         </div>

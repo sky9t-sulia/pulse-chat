@@ -20,6 +20,8 @@ interface AppContextType {
   setTheme: (theme: 'dark' | 'light') => void;
   chatSettings: import('../types/types').ChatSettings;
   setChatSettings: (settings: import('../types/types').ChatSettings) => void;
+  showSettings: boolean;
+  setShowSettings: (show: boolean) => void;
   setActiveProvider: (provider: Provider | null) => void;
   setActiveConversationId: (id: string | null) => void;
   refreshConversations: () => Promise<void>;
@@ -65,6 +67,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const { theme, setTheme, chatSettings, setChatSettings } = useSettings();
 
+  const [showSettings, setShowSettings] = useState(false);
+
   const setActiveProvider = useCallback((p: Provider | null) => {
     setActiveProviderState(p);
     if (p) {
@@ -97,7 +101,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [refreshConversations, refreshProviders]);
 
   useEffect(() => {
-    refreshMessages();
+    refreshMessages(activeConversationId);
   }, [activeConversationId]);
 
   const value: AppContextType = {
@@ -112,6 +116,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTheme,
     chatSettings,
     setChatSettings,
+    showSettings,
+    setShowSettings,
     setActiveProvider,
     setActiveConversationId,
     refreshConversations,
