@@ -102,6 +102,7 @@ interface ChatAPI {
     update: (id: string, tool: Partial<Omit<Tool, 'id' | 'created_at' | 'updated_at'>>) => Promise<void>;
     delete: (id: string) => Promise<void>;
     execute: (toolName: string, toolArgsJson: string) => Promise<ToolResult>;
+    reorder: (order: string[]) => Promise<void>;
   };
 }
 
@@ -113,6 +114,7 @@ interface Tool {
   handler_code: string;
   enabled: boolean;
   is_built_in: boolean;
+  sort_order: number;
   created_at: number;
   updated_at: number;
 }

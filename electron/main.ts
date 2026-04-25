@@ -62,6 +62,7 @@ async function initDatabase() {
       handler_code TEXT NOT NULL DEFAULT '',
       enabled INTEGER NOT NULL DEFAULT 1,
       is_built_in INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -136,6 +137,18 @@ async function initDatabase() {
   // Migration: add handler_code column to tools if it doesn't exist yet
   try {
     db.run(`ALTER TABLE tools ADD COLUMN handler_code TEXT NOT NULL DEFAULT ''`);
+  } catch {
+    // Column already exists or migration not needed
+  }
+
+  // Migration: add sort_order column to tools if it doesn't exist yet
+  try {
+    db.run(`ALTER TABLE tools ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`);
+    // Assign existing tools sequential sort_order values
+    const existing = query<any>(`SELECT id FROM tools ORDER BY created_at`);
+    existing.forEach((row, i) => {
+      run(`UPDATE tools SET sort_order = ? WHERE id = ?`, [i, row.id]);
+    });
   } catch {
     // Column already exists or migration not needed
   }
@@ -524,7 +537,7 @@ ipcMain.handle('providers:get', (_e, id: string) => {
 // ─── Tools ───────────────────────────────────────────────────
 
 ipcMain.handle('tools:list', () => {
-  const rows = query<any>(`SELECT * FROM tools ORDER BY name`);
+  const rows = query<any>(`SELECT * FROM tools ORDER BY sort_order`);
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
@@ -533,6 +546,7 @@ ipcMain.handle('tools:list', () => {
     handler_code: row.handler_code || '',
     enabled: row.enabled === 1,
     is_built_in: row.is_built_in === 1,
+    sort_order: row.sort_order,
     created_at: row.created_at,
     updated_at: row.updated_at,
   }));
@@ -641,4 +655,11 @@ ipcMain.handle('tools:execute', async (_e, toolName: string, toolArgsJson: strin
     const msg = err instanceof Error ? err.message : String(err);
     return { content: '', error: `Tool execution error: ${msg}`, duration_ms: Date.now() - startTime };
   }
+});
+
+ipcMain.handle('tools:reorder', (_e, order: string[]) => {
+  order.forEach((id, i) => {
+    run('UPDATE tools SET sort_order = ?, updated_at = ? WHERE id = ?', [i, Date.now(), id]);
+  });
+  saveDb();
 });

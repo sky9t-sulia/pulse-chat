@@ -9,6 +9,7 @@ interface ToolRegistryContextType {
   updateTool: (id: string, updates: Partial<Omit<Tool, 'id' | 'created_at' | 'updated_at'>>) => Promise<void>;
   addTool: (tool: Omit<Tool, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   deleteTool: (id: string) => Promise<void>;
+  reorderTools: (order: string[]) => Promise<void>;
 }
 
 const ToolRegistryContext = createContext<ToolRegistryContextType | null>(null);
@@ -74,6 +75,14 @@ export function ToolRegistryProvider({ children }: { children: React.ReactNode }
     [refreshTools]
   );
 
+  const reorderTools = useCallback(
+    async (order: string[]) => {
+      await window.chatApi.tools.reorder(order);
+      await refreshTools();
+    },
+    [refreshTools]
+  );
+
   const enabledTools = tools.filter((t) => t.enabled);
 
   const toolDefinitions = enabledTools.map(convertToolToDefinition);
@@ -90,6 +99,7 @@ export function ToolRegistryProvider({ children }: { children: React.ReactNode }
     updateTool,
     addTool,
     deleteTool,
+    reorderTools,
   };
 
   return (

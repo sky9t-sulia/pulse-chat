@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useToolRegistry } from '../../context/tools';
-import { Plus, Trash2, Pencil, Wrench, Eye } from 'lucide-react';
+import { Plus, Trash2, Pencil, Wrench, Eye, GripVertical } from 'lucide-react';
 import type { Tool } from '../../types/types';
 import { ToolsTabForm } from './ToolsTabForm';
 
 export function ToolsTab() {
-  const { tools, enabledTools, addTool, deleteTool, updateTool } = useToolRegistry();
+  const { tools, enabledTools, addTool, deleteTool, updateTool, reorderTools } = useToolRegistry();
   const [showAdd, setShowAdd] = useState(false);
   const [activeCount, setActiveCount] = useState(0);
   const isAnyActive = showAdd || activeCount > 0;
@@ -14,6 +14,9 @@ export function ToolsTab() {
   const [addParameters, setAddParameters] = useState('{}');
   const [addHandlerCode, setAddHandlerCode] = useState('');
   const [addParamError, setAddParamError] = useState<string | null>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dropIdx, setDropIdx] = useState<number | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const openAdd = () => {
     setAddName('');
@@ -41,9 +44,20 @@ export function ToolsTab() {
       setAddParamError('Parameters must be a JSON object with type: "object"');
       return;
     }
-    addTool({ name: addName, description: addDescription, parameters: parsed as Record<string, unknown>, handler_code: addHandlerCode, enabled: true, is_built_in: false });
+    addTool({ name: addName, description: addDescription, parameters: parsed as Record<string, unknown>, handler_code: addHandlerCode, enabled: true, is_built_in: false, sort_order: tools.length });
     setShowAdd(false);
   };
+
+  const handleReorder = useCallback(() => {
+    if (dragIdx !== null && dropIdx !== null && dragIdx !== dropIdx) {
+      const newOrder = [...tools.map((t) => t.id)];
+      const [moved] = newOrder.splice(dragIdx, 1);
+      newOrder.splice(dropIdx, 0, moved);
+      reorderTools(newOrder);
+    }
+    setDragIdx(null);
+    setDropIdx(null);
+  }, [dragIdx, dropIdx, tools, reorderTools]);
 
   return (
     <div>
@@ -60,20 +74,67 @@ export function ToolsTab() {
         )}
       </div>
 
-      <div className="space-y-2">
+      <div
+        ref={listRef}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (dragIdx === null || listRef.current === null) return;
+          const el = listRef.current;
+          const children = Array.from(el.children) as HTMLElement[];
+          // Find which child the mouse is over
+          let targetIdx = children.length;
+          for (let i = 0; i < children.length; i++) {
+            const rect = children[i].getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            if (e.clientY < midY) {
+              targetIdx = i;
+              break;
+            }
+          }
+          // If dragging from below, adjust: dropping on an item that comes after
+          // the dragged item should insert at that index, otherwise at index+1
+          if (dragIdx < targetIdx) {
+            targetIdx = Math.max(targetIdx - 1, 0);
+          }
+          setDropIdx(targetIdx);
+        }}
+        onDragLeave={() => {
+          // Only clear if we actually left the container
+          if (listRef.current && !listRef.current.contains(document.activeElement)) {
+            setDropIdx(null);
+          }
+        }}
+        onDrop={() => handleReorder()}
+        onDragEnd={() => { setDragIdx(null); setDropIdx(null); }}
+        className="space-y-2"
+      >
         {tools.length === 0 && !isAnyActive ? (
           <p className="text-xs theme-text-muted text-center py-4">No tools configured.</p>
         ) : (
-          tools.map((tool) => (
-            <InlineToolItem
-              key={tool.id}
-              tool={tool}
-              onToggle={() => updateTool(tool.id, { enabled: !tool.enabled })}
-              onDelete={() => deleteTool(tool.id)}
-              onUpdate={(data) => updateTool(tool.id, data)}
-              onModeChange={(active) => setActiveCount((n) => n + (active ? 1 : -1))}
-            />
-          ))
+          tools.map((tool, index) => {
+            const isDragged = dragIdx === index;
+            const isDropTarget = dropIdx === index;
+            const showIndicator = dropIdx === index && dragIdx !== index;
+            return (
+              <div key={tool.id}>
+                {/* Drop indicator line above the target */}
+                {showIndicator && (
+                  <div className="h-0.5 -my-1 mx-2 rounded bg-[var(--accent)] transition-opacity" />
+                )}
+                <InlineToolItem
+                  tool={tool}
+                  index={index}
+                  isDragged={isDragged}
+                  isDropTarget={isDropTarget}
+                  setDragItem={(v) => setDragIdx(v)}
+                  onToggle={() => updateTool(tool.id, { enabled: !tool.enabled })}
+                  onDelete={() => deleteTool(tool.id)}
+                  onUpdate={(data) => updateTool(tool.id, data)}
+                  onModeChange={(active) => setActiveCount((n) => n + (active ? 1 : -1))}
+                />
+              </div>
+            );
+          })
         )}
 
         {showAdd && (
@@ -106,12 +167,20 @@ export function ToolsTab() {
 
 function InlineToolItem({
   tool,
+  index,
+  isDragged,
+  isDropTarget,
+  setDragItem,
   onToggle,
   onDelete,
   onUpdate,
   onModeChange,
 }: {
   tool: Tool;
+  index: number;
+  isDragged: boolean;
+  isDropTarget: boolean;
+  setDragItem: (v: number | null) => void;
   onToggle: () => void;
   onDelete: () => void;
   onUpdate: (data: Partial<Omit<Tool, 'id' | 'created_at' | 'updated_at'>>) => void;
@@ -190,10 +259,15 @@ function InlineToolItem({
 
   return (
     <div
+      draggable={!tool.is_built_in}
+      onDragStart={() => setDragItem(!tool.is_built_in ? index : null)}
+      onDragEnd={() => setDragItem(null)}
       className={`flex items-center gap-3 px-3 py-2.5 border theme-border-light rounded-lg transition-colors ${
-        !tool.enabled ? 'opacity-50' : ''
-      }`}
+        isDragged ? 'opacity-40' : ''
+      } ${isDropTarget ? 'border-[var(--accent)]' : ''}
+      } ${!tool.enabled ? 'opacity-50' : ''}`}
     >
+      <GripVertical className={`w-4 h-4 flex-shrink-0 cursor-grab active:cursor-grabbing ${tool.is_built_in ? 'hidden' : 'theme-text-muted/40'}`} />
       <Wrench className="w-4 h-4 theme-text-muted flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -207,6 +281,22 @@ function InlineToolItem({
         <p className="text-xs theme-text-muted mt-0.5">{tool.description}</p>
       </div>
       <div className="flex items-center gap-1.5 flex-shrink-0">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={tool.enabled}
+          onClick={onToggle}
+          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+            tool.enabled ? 'bg-[var(--accent)]' : 'bg-gray-600/40'
+          }`}
+          title={tool.enabled ? 'Disable' : 'Enable'}
+        >
+          <span
+            className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${
+              tool.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+            }`}
+          />
+        </button>
         {tool.is_built_in ? (
           <button
             type="button"
@@ -218,22 +308,6 @@ function InlineToolItem({
           </button>
         ) : (
           <>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={tool.enabled}
-              onClick={onToggle}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-                tool.enabled ? 'bg-[var(--accent)]' : 'bg-gray-600/40'
-              }`}
-              title={tool.enabled ? 'Disable' : 'Enable'}
-            >
-              <span
-                className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${
-                  tool.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
             <button
               type="button"
               onClick={startEdit}

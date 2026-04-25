@@ -88,6 +88,7 @@ export interface Tool {
   handler_code: string;
   enabled: boolean;
   is_built_in: boolean; // cannot be deleted, only toggled
+  sort_order: number;
   created_at: number;
   updated_at: number;
 }

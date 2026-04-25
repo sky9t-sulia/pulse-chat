@@ -105,13 +105,22 @@ export async function sendMessage(args: SendMessageArgs) {
 
   while (maxLoops > 0) {
     accumulatedContent = loopResult.content;
-    accumulatedReasoningContent = loopResult.reasoning;
+    if (loopResult.reasoning) {
+      accumulatedReasoningContent = accumulatedReasoningContent
+        ? accumulatedReasoningContent + loopResult.reasoning
+        : loopResult.reasoning;
+    }
     finalStats = loopResult.stats;
     if (firstContentAt === null && (accumulatedContent || accumulatedReasoningContent)) {
       firstContentAt = Date.now();
     }
 
     if (loopResult.toolCalls.length === 0) break;
+
+    const toolNames = loopResult.toolCalls.map((tc) => tc.function.name).join(', ');
+    if (accumulatedReasoningContent) {
+      accumulatedReasoningContent += `\n\n*USED ${toolNames} TOOL*\n\n`;
+    }
 
     loopMessages = [
       ...loopMessages,

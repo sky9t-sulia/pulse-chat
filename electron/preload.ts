@@ -60,6 +60,7 @@ interface Tool {
   handler_code: string;
   enabled: boolean;
   is_built_in: boolean;
+  sort_order: number;
   created_at: number;
   updated_at: number;
 }
@@ -135,6 +136,7 @@ const chatApi = {
     delete: (id: string) => ipcRenderer.invoke('tools:delete', id),
     execute: (toolName: string, toolArgsJson: string) =>
       ipcRenderer.invoke('tools:execute', toolName, toolArgsJson) as Promise<ToolResult>,
+    reorder: (order: string[]) => ipcRenderer.invoke('tools:reorder', order),
   },
 };
 
