@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import { Pencil, Trash2, Plus, ServerIcon } from 'lucide-react';
 import type { Provider } from '../../types/types';
 import { ProviderForm } from './ProviderForm/ProviderForm';
 
@@ -50,6 +50,10 @@ export function ProvidersTab() {
         </div>
       ) : (
         <div className="space-y-2">
+          <div className="flex items-center gap-1.5 mb-2">
+            <ServerIcon className="w-3 h-3 theme-text-muted" />
+            <h4 className="text-[11px] font-medium theme-text-muted uppercase tracking-wider">OpenAI-Compatible</h4>
+          </div>
           {providers.length === 0 && (
             <p className="text-xs theme-text-muted py-4 text-center">
               No providers configured

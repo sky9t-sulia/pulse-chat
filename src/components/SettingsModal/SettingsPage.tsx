@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Server, Wrench, MessageSquare } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ProvidersTab } from './ProvidersTab';
@@ -14,15 +14,26 @@ const tabs = [
 export function SettingsPage() {
   const { setShowSettings } = useApp();
   const [tab, setTab] = useState<'providers' | 'tools' | 'chat'>('providers');
+  const [closing, setClosing] = useState(false);
   const active = tabs.find((t) => t.id === tab)!;
 
+  const handleClose = () => {
+    setClosing(true);
+  };
+
+  useEffect(() => {
+    if (!closing) return;
+    const t = setTimeout(() => setShowSettings(false), 150);
+    return () => clearTimeout(t);
+  }, [closing, setShowSettings]);
+
   return (
-    <div className="flex-1 flex h-full overflow-hidden">
+    <div className={`flex-1 flex h-full overflow-hidden ${closing ? 'settings-exit' : 'settings-enter'}`}>
       {/* Sidebar tabs */}
       <div className="w-48 flex-shrink-0 flex flex-col bg-[var(--bg-sidebar-transparent)]">
         <div className="flex items-center gap-2 px-4 py-3 theme-border">
           <button
-            onClick={() => setShowSettings(false)}
+            onClick={handleClose}
             className="p-1 theme-text-secondary hover-theme-text-primary transition-colors rounded"
             title="Back to chat"
           >
@@ -61,12 +72,9 @@ export function SettingsPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="px-8 pt-6 pb-4 flex-shrink-0">
-          <h2 className="text-lg font-medium theme-text-heading">{active.label}</h2>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-8 pb-6">
+      <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
+        <div className="pt-4 px-8 pb-6 max-w-3xl w-full mx-auto">
+          <h2 className="text-sm font-medium theme-text-heading">{active.label}</h2>
           <>
             {tab === 'providers' ? <ProvidersTab /> : tab === 'tools' ? <ToolsTab /> : <ChatSettingsTab />}
           </>

@@ -21,6 +21,8 @@ export function ChatSettingsTab() {
 
   return (
     <div className="space-y-5">
+      <div className="flex items-center justify-between mb-10">
+      </div>
       <div>
         <label className="block text-xs text-gray-400 mb-1">System Prompt</label>
         <ThemedTextarea
