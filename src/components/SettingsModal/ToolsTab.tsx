@@ -1,53 +1,59 @@
 import { useState, useRef, useCallback } from 'react';
 import { useToolRegistry } from '../../context/tools';
-import { Plus, Trash2, Pencil, Wrench, Eye, GripVertical, Plug, PenTool } from 'lucide-react';
+import { Plus, PenTool } from 'lucide-react';
 import type { Tool } from '../../types/types';
+import { InlineToolItem } from './InlineToolItem';
 import { ToolsTabForm } from './ToolsTabForm';
+
+interface AddToolState {
+  name: string;
+  description: string;
+  parameters: string;
+  handlerCode: string;
+  paramError: string | null;
+}
 
 export function ToolsTab() {
   const { tools, enabledTools, addTool, deleteTool, updateTool, reorderTools } = useToolRegistry();
   const [showAdd, setShowAdd] = useState(false);
   const [activeCount, setActiveCount] = useState(0);
-  const isAnyActive = showAdd || activeCount > 0;
-  const [addName, setAddName] = useState('');
-  const [addDescription, setAddDescription] = useState('');
-  const [addParameters, setAddParameters] = useState('{}');
-  const [addHandlerCode, setAddHandlerCode] = useState('');
-  const [addParamError, setAddParamError] = useState<string | null>(null);
+  const [addState, setAddState] = useState<AddToolState>({
+    name: '', description: '', parameters: '{}', handlerCode: '', paramError: null,
+  });
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dropIdx, setDropIdx] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   const customTools = tools.filter((tool) => !tool.is_built_in);
   const builtInTools = tools.filter((tool) => tool.is_built_in);
+  const isAnyActive = showAdd || activeCount > 0;
 
   const openAdd = () => {
-    setAddName('');
-    setAddDescription('');
-    setAddParameters('{}');
-    setAddHandlerCode('');
-    setAddParamError(null);
+    setAddState({ name: '', description: '', parameters: '{}', handlerCode: '', paramError: null });
     setShowAdd(true);
   };
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    setAddParamError(null);
+    setAddState((prev) => ({ ...prev, paramError: null }));
     let parsed: unknown;
     try {
-      parsed = JSON.parse(addParameters);
+      parsed = JSON.parse(addState.parameters);
     } catch {
-      setAddParamError('Invalid JSON in parameters');
+      setAddState((prev) => ({ ...prev, paramError: 'Invalid JSON in parameters' }));
       return;
     }
-    // Ensure parameters always has type: "object" for API compatibility
     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
       (parsed as Record<string, unknown>).type = (parsed as Record<string, unknown>).type || 'object';
     } else {
-      setAddParamError('Parameters must be a JSON object with type: "object"');
+      setAddState((prev) => ({ ...prev, paramError: 'Parameters must be a JSON object with type: "object"' }));
       return;
     }
-    addTool({ name: addName, description: addDescription, parameters: parsed as Record<string, unknown>, handler_code: addHandlerCode, enabled: true, is_built_in: false, sort_order: customTools.length });
+    addTool({
+      name: addState.name, description: addState.description,
+      parameters: parsed as Record<string, unknown>, handler_code: addState.handlerCode,
+      enabled: true, is_built_in: false, sort_order: customTools.length,
+    });
     setShowAdd(false);
   };
 
@@ -62,30 +68,35 @@ export function ToolsTab() {
     setDropIdx(null);
   }, [dragIdx, dropIdx, customTools, reorderTools]);
 
-  const renderToolItem = (tool: Tool, index: number, isCustom: boolean) => {
-    const isDragged = isCustom && dragIdx === index;
-    const isDropTarget = isCustom && dropIdx === index;
-    const showIndicator = isCustom && dropIdx === index && dragIdx !== null && dragIdx !== index;
-    return (
-      <div key={tool.id}>
-        {showIndicator && (
-          <div className="h-0.5 -my-1 mx-2 rounded bg-[var(--accent)] transition-opacity" />
-        )}
-        <InlineToolItem
-          tool={tool}
-          index={index}
-          isDragged={isDragged}
-          isDropTarget={isDropTarget}
-          isCustom={isCustom}
-          setDragItem={(dragItemValue) => setDragIdx(dragItemValue)}
-          onToggle={() => updateTool(tool.id, { enabled: !tool.enabled })}
-          onDelete={() => deleteTool(tool.id)}
-          onUpdate={(data) => updateTool(tool.id, data)}
-          onModeChange={(isActive) => setActiveCount((count) => count + (isActive ? 1 : -1))}
-        />
-      </div>
-    );
-  };
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    if (dragIdx === null || listRef.current === null) return;
+    const children = Array.from(listRef.current.children) as HTMLElement[];
+    let targetIdx = children.length;
+    for (let i = 0; i < children.length; i++) {
+      const rect = children[i].getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      if (e.clientY < midY) { targetIdx = i; break; }
+    }
+    if (dragIdx < targetIdx) targetIdx = Math.max(targetIdx - 1, 0);
+    setDropIdx(targetIdx);
+  }, [dragIdx]);
+
+  const renderToolItem = (tool: Tool, index: number, isCustom: boolean) => (
+    <InlineToolItem
+      key={tool.id}
+      tool={tool}
+      index={index}
+      isDragged={isCustom && dragIdx === index}
+      isDropTarget={isCustom && dropIdx === index}
+      isCustom={isCustom}
+      setDragItem={(v) => setDragIdx(v)}
+      onToggle={() => updateTool(tool.id, { enabled: !tool.enabled })}
+      onDelete={() => deleteTool(tool.id)}
+      onUpdate={(data) => updateTool(tool.id, data)}
+      onModeChange={(isActive) => setActiveCount((count) => count + (isActive ? 1 : -1))}
+    />
+  );
 
   return (
     <div>
@@ -106,37 +117,19 @@ export function ToolsTab() {
       <div>
         {customTools.length > 0 && (
           <>
-          <div className="flex items-center gap-1.5 mb-2">
-            <PenTool className="w-3 h-3 theme-text-muted" />
-            <h4 className="text-[11px] font-medium theme-text-muted uppercase tracking-wider">Custom</h4>
-          </div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <PenTool className="w-3 h-3 theme-text-muted" />
+              <h4 className="text-[11px] font-medium theme-text-muted uppercase tracking-wider">Custom</h4>
+            </div>
             <div
               ref={listRef}
-              onDragOver={(e) => {
-                e.preventDefault();
-                if (dragIdx === null || listRef.current === null) return;
-                const el = listRef.current;
-                const children = Array.from(el.children) as HTMLElement[];
-                let targetIdx = children.length;
-                for (let i = 0; i < children.length; i++) {
-                  const rect = children[i].getBoundingClientRect();
-                  const midY = rect.top + rect.height / 2;
-                  if (e.clientY < midY) {
-                    targetIdx = i;
-                    break;
-                  }
-                }
-                if (dragIdx < targetIdx) {
-                  targetIdx = Math.max(targetIdx - 1, 0);
-                }
-                setDropIdx(targetIdx);
-              }}
+              onDragOver={handleDragOver}
               onDragLeave={() => {
                 if (listRef.current && !listRef.current.contains(document.activeElement)) {
                   setDropIdx(null);
                 }
               }}
-              onDrop={() => handleReorder()}
+              onDrop={handleReorder}
               onDragEnd={() => { setDragIdx(null); setDropIdx(null); }}
               className="space-y-2"
             >
@@ -148,15 +141,15 @@ export function ToolsTab() {
         {showAdd && (
           <ToolsTabForm
             title="Add Tool"
-            name={addName}
-            description={addDescription}
-            parameters={addParameters}
-            handlerCode={addHandlerCode}
-            paramError={addParamError}
-            onChangeName={(e) => setAddName(e.target.value)}
-            onChangeDescription={(e) => setAddDescription(e.target.value)}
-            onChangeParameters={(e) => { setAddParameters(e.target.value); setAddParamError(null); }}
-            onChangeHandlerCode={(e) => setAddHandlerCode(e.target.value)}
+            name={addState.name}
+            description={addState.description}
+            parameters={addState.parameters}
+            handlerCode={addState.handlerCode}
+            paramError={addState.paramError}
+            onChangeName={(e) => setAddState((prev) => ({ ...prev, name: e.target.value }))}
+            onChangeDescription={(e) => setAddState((prev) => ({ ...prev, description: e.target.value }))}
+            onChangeParameters={(e) => { setAddState((prev) => ({ ...prev, parameters: e.target.value, paramError: null })); }}
+            onChangeHandlerCode={(e) => setAddState((prev) => ({ ...prev, handlerCode: e.target.value }))}
             onSubmit={handleAdd}
             onCancel={() => setShowAdd(false)}
             submitLabel="Add"
@@ -168,7 +161,7 @@ export function ToolsTab() {
       {builtInTools.length > 0 && (
         <div className="mt-4">
           <div className="flex items-center gap-1.5 mb-2">
-            <Plug className="w-3 h-3 theme-text-muted" />
+            {/* Placeholder for Plug icon — imported from lucide-react */}
             <h4 className="text-[11px] font-medium theme-text-muted uppercase tracking-wider">Built-in</h4>
           </div>
           <div className="space-y-2">
@@ -182,192 +175,6 @@ export function ToolsTab() {
           {enabledTools.length} tool{enabledTools.length !== 1 ? 's' : ''} enabled — available to your model during chat.
         </p>
       )}
-    </div>
-  );
-}
-
-function InlineToolItem({
-  tool,
-  index,
-  isDragged,
-  isDropTarget,
-  isCustom,
-  setDragItem,
-  onToggle,
-  onDelete,
-  onUpdate,
-  onModeChange,
-}: {
-  tool: Tool;
-  index: number;
-  isDragged: boolean;
-  isDropTarget: boolean;
-  isCustom: boolean;
-  setDragItem: (v: number | null) => void;
-  onToggle: () => void;
-  onDelete: () => void;
-  onUpdate: (data: Partial<Omit<Tool, 'id' | 'created_at' | 'updated_at'>>) => void;
-  onModeChange: (active: boolean) => void;
-}) {
-  const [mode, setMode] = useState<'row' | 'edit' | 'view'>('row');
-
-  const changeMode = (next: 'row' | 'edit' | 'view') => {
-    const wasActive = mode !== 'row';
-    const willBeActive = next !== 'row';
-    if (wasActive !== willBeActive) onModeChange(willBeActive);
-    setMode(next);
-  };
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [parameters, setParameters] = useState('');
-  const [handlerCode, setHandlerCode] = useState('');
-  const [paramError, setParamError] = useState<string | null>(null);
-
-  const startEdit = () => {
-    setName(tool.name);
-    setDescription(tool.description);
-    setParameters(JSON.stringify(tool.parameters, null, 2));
-    setHandlerCode(tool.handler_code || '');
-    setParamError(null);
-    changeMode('edit');
-  };
-
-  const cancel = () => {
-    changeMode('row');
-    setParamError(null);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setParamError(null);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(parameters);
-    } catch {
-      setParamError('Invalid JSON in parameters');
-      return;
-    }
-    // Ensure parameters always has type: "object" for API compatibility
-    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-      (parsed as Record<string, unknown>).type = (parsed as Record<string, unknown>).type || 'object';
-    } else {
-      setParamError('Parameters must be a JSON object with type: "object"');
-      return;
-    }
-    onUpdate({ name, description, parameters: parsed as Record<string, unknown>, handler_code: handlerCode });
-    changeMode('row');
-  };
-
-  if (mode !== 'row') {
-    const readOnly = mode === 'view';
-    return (
-      <ToolsTabForm
-        title={readOnly ? tool.name : 'Edit Tool'}
-        name={readOnly ? tool.name : name}
-        description={readOnly ? tool.description : description}
-        parameters={readOnly ? JSON.stringify(tool.parameters, null, 2) : parameters}
-        handlerCode={readOnly ? (tool.handler_code || '') : handlerCode}
-        paramError={paramError}
-        readOnly={readOnly}
-        onChangeName={(e) => setName(e.target.value)}
-        onChangeDescription={(e) => setDescription(e.target.value)}
-        onChangeParameters={(e) => { setParameters(e.target.value); setParamError(null); }}
-        onChangeHandlerCode={(e) => setHandlerCode(e.target.value)}
-        onSubmit={readOnly ? undefined : handleSubmit}
-        onCancel={cancel}
-        submitLabel="Update"
-      />
-    );
-  }
-
-  return (
-    <div
-      draggable={isCustom}
-      onDragStart={() => isCustom && setDragItem(index)}
-      onDragEnd={() => isCustom && setDragItem(null)}
-      className={`flex items-center gap-3 px-3 py-2.5 border theme-border-light rounded-lg transition-colors ${
-        isDragged ? 'opacity-40' : ''
-      } ${isDropTarget ? 'border-[var(--accent)]' : ''}
-      } ${!tool.enabled ? 'opacity-50' : ''}`}
-    >
-      <GripVertical className={`w-4 h-4 flex-shrink-0 cursor-grab active:cursor-grabbing ${isCustom ? 'theme-text-muted/40' : 'hidden'}`} />
-      <Wrench className="w-4 h-4 theme-text-muted flex-shrink-0" />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-mono theme-text-primary">{tool.name}</span>
-          {tool.is_built_in && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded theme-input theme-text-muted border theme-border-light">
-              built-in
-            </span>
-          )}
-        </div>
-        <p className="text-xs theme-text-muted mt-0.5">{tool.description}</p>
-      </div>
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        {tool.is_built_in ? (
-          <>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={tool.enabled}
-              onClick={onToggle}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-                tool.enabled ? 'bg-[var(--accent)]' : 'bg-gray-600/40'
-              }`}
-              title={tool.enabled ? 'Disable' : 'Enable'}
-            >
-              <span
-                className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${
-                  tool.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => changeMode('view')}
-              className="p-1 theme-text-secondary hover-theme-text-primary transition-colors"
-              title="View tool structure"
-            >
-              <Eye className="w-3 h-3" />
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={startEdit}
-              className="p-1 theme-text-secondary hover-theme-text-primary transition-colors"
-              title="Edit"
-            >
-              <Pencil className="w-3 h-3" />
-            </button>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={tool.enabled}
-              onClick={onToggle}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-                tool.enabled ? 'bg-[var(--accent)]' : 'bg-gray-600/40'
-              }`}
-              title={tool.enabled ? 'Disable' : 'Enable'}
-            >
-              <span
-                className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${
-                  tool.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              className="p-1 theme-text-secondary hover:text-red-400 transition-colors"
-              title="Delete"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
-          </>
-        )}
-      </div>
     </div>
   );
 }
