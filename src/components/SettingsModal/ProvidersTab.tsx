@@ -60,10 +60,10 @@ export function ProvidersTab() {
             return (
             <div
               key={provider.id}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all cursor-pointer ${
+              className={`flex hover-theme-border-light theme-border items-center gap-3 px-3 py-2.5 rounded-lg border transition-all cursor-pointer ${
                 isActive
-                  ? 'border-gray-600 theme-sidebar-active'
-                  : 'theme-border hover-theme-border-light'
+                  ? 'bg-[color:var(--bg-sidebar)]'
+                  : ''
               }`}
               onClick={() => setActiveProvider(provider)}
             >

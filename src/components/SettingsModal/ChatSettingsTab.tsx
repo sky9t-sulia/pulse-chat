@@ -27,7 +27,7 @@ export function ChatSettingsTab() {
           value={chatSettings.system_prompt}
           onChange={(e) => setChatSettings({ ...chatSettings, system_prompt: e.target.value })}
           placeholder="Optional — sent as the system message on every request."
-          className="resize-y"
+          className="resize-y h-24"
         />
         <p className="text-xs theme-text-muted mt-1">
           Applied to new messages in every conversation.
