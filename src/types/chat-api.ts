@@ -35,9 +35,9 @@ export interface ApiMessage {
 }
 
 export interface StreamingCallbacks {
-  onContent: (s: string) => void;
-  onReasoning: (s: string) => void;
-  onStats: (s: TokenStats | null) => void;
-  onPhase: (p: LoadingPhase) => void;
-  onError: (s: string) => void;
+  onContent: (content: string) => void;
+  onReasoning: (reasoning: string) => void;
+  onStats: (stats: TokenStats | null) => void;
+  onPhase: (phase: LoadingPhase) => void;
+  onError: (errorMessage: string) => void;
 }

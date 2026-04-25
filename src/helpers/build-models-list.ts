@@ -40,7 +40,7 @@ export function buildModelsList(
       return { key, display_name: displayName, enabled: isEnabled };
     });
 
-  if (defaultModel && !modelsList.some((m) => m.key === defaultModel)) {
+  if (defaultModel && !modelsList.some((model) => model.key === defaultModel)) {
     const override = modelOverrides[defaultModel];
     const info = extractInfo(modelObjectsMap[defaultModel] as Record<string, unknown> | undefined);
     const displayName = info?.display_name || defaultModel;

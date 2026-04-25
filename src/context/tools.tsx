@@ -24,11 +24,11 @@ function normalizeParameters(params: unknown): Record<string, unknown> {
   if (!params || typeof params !== 'object' || Array.isArray(params)) {
     return { type: 'object', properties: {}, required: [] };
   }
-  const p = params as Record<string, unknown>;
-  if (p.type !== 'object') {
-    return { ...p, type: 'object' };
+  const paramsObj = params as Record<string, unknown>;
+  if (paramsObj.type !== 'object') {
+    return { ...paramsObj, type: 'object' };
   }
-  return { ...p, properties: p.properties || {}, required: p.required || [] };
+  return { ...paramsObj, properties: paramsObj.properties || {}, required: paramsObj.required || [] };
 }
 
 function convertToolToDefinition(tool: Tool): unknown {
@@ -83,7 +83,7 @@ export function ToolRegistryProvider({ children }: { children: React.ReactNode }
     [refreshTools]
   );
 
-  const enabledTools = tools.filter((t) => t.enabled);
+  const enabledTools = tools.filter((tool) => tool.enabled);
 
   const toolDefinitions = enabledTools.map(convertToolToDefinition);
 

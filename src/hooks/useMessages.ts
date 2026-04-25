@@ -42,7 +42,7 @@ export function useMessages(
 
   const deleteMessage = useCallback(async (id: string) => {
     await window.chatApi.messages.deleteOne(id);
-    setMessages((prev) => prev.filter((m) => m.id !== id));
+    setMessages((prev) => prev.filter((message) => message.id !== id));
   }, []);
 
   return { addMessage, deleteMessages, deleteMessage };

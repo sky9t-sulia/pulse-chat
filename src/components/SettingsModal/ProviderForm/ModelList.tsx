@@ -42,7 +42,7 @@ export function ModelList({
             {availableModels.length} model{availableModels.length !== 1 ? 's' : ''}
           </span>
           <span className="theme-text-muted">
-            · {availableModels.filter((m) => modelEnabled[m] !== false).length} enabled
+            · {availableModels.filter((model) => modelEnabled[model] !== false).length} enabled
           </span>
         </span>
       </button>

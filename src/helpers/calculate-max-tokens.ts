@@ -3,7 +3,7 @@ export function calculateMaxTokens(
   displayModelName: string,
   activeProviderModelInfo: { max_context_length?: number } | null,
 ): number {
-  const selectedModelInfo = availableModels.find((m) => m.key === displayModelName)?.model_info;
+  const selectedModelInfo = availableModels.find((model) => model.key === displayModelName)?.model_info;
   return selectedModelInfo?.max_context_length
     ? Number(selectedModelInfo.max_context_length)
     : activeProviderModelInfo?.max_context_length

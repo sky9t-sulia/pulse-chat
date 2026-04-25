@@ -123,7 +123,7 @@ export function ProviderForm({
             ...prev,
             [key]: { ...prev[key], max_context: val },
           }))}
-          onExpandToggle={() => setModelsListExpanded((v) => !v)}
+          onExpandToggle={() => setModelsListExpanded((expanded) => !expanded)}
           expanded={modelsListExpanded}
         />
       )}

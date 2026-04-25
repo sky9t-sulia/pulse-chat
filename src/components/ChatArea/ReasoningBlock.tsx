@@ -9,7 +9,7 @@ export function ReasoningBlock({ reasoning }: { reasoning: string }) {
     <div className="mb-3">
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => setExpanded((expanded) => !expanded)}
         className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
       >
         <span className="text-xs theme-text-muted">Reasoning</span>

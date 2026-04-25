@@ -18,9 +18,9 @@ const openaiStrategy: ProviderStrategy = {
   parseModelList: (json: unknown) => {
     const data = json as Record<string, unknown>;
     const dataArray = data.data as Record<string, unknown>[] | undefined;
-    const models = dataArray?.map((m) => m.id as string).filter(Boolean) || [];
+    const models = dataArray?.map((modelEntry) => modelEntry.id as string).filter(Boolean) || [];
     const modelObjects = Object.fromEntries(
-      dataArray?.map((m) => [m.id, m]) ?? []
+      dataArray?.map((modelEntry) => [modelEntry.id, modelEntry]) ?? []
     ) as Record<string, unknown>;
     return { models, modelObjects };
   },

@@ -6,7 +6,7 @@ export function buildThinkBuffer() {
   let buffer = '';
   let inside = false;
 
-  const route = (chunk: string, onContent: (s: string) => void, onReasoning: (s: string) => void) => {
+  const route = (chunk: string, onContent: (text: string) => void, onReasoning: (text: string) => void) => {
     buffer += chunk;
     while (buffer.length > 0) {
       if (inside) {
@@ -33,7 +33,7 @@ export function buildThinkBuffer() {
     }
   };
 
-  const flush = (onContent: (s: string) => void, onReasoning: (s: string) => void) => {
+  const flush = (onContent: (text: string) => void, onReasoning: (text: string) => void) => {
     if (buffer.length > 0) {
       if (inside) {
         onReasoning(buffer);

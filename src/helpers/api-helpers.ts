@@ -16,11 +16,11 @@ export function buildRequestBody(
     : messages;
   const body: Record<string, unknown> = {
     model,
-    messages: withSystem.map((m) => {
-      const out: Record<string, unknown> = { role: m.role, content: m.content };
-      if (m.tool_calls) out.tool_calls = m.tool_calls;
-      if (m.tool_call_id) out.tool_call_id = m.tool_call_id;
-      if (m.name) out.name = m.name;
+    messages: withSystem.map((message) => {
+      const out: Record<string, unknown> = { role: message.role, content: message.content };
+      if (message.tool_calls) out.tool_calls = message.tool_calls;
+      if (message.tool_call_id) out.tool_call_id = message.tool_call_id;
+      if (message.name) out.name = message.name;
       return out;
     }),
     stream: true,
@@ -39,7 +39,10 @@ export async function generateTitle(
   userMessage: string,
   assistantMessage: string,
 ): Promise<string | null> {
-  const prompt = `Summarize the following chat in 3-6 words as a short title. Respond with only the title — no quotes, no trailing punctuation.\n\nUser: ${userMessage.slice(0, 500)}\nAssistant: ${assistantMessage.slice(0, 500)}`;
+  const prompt = `Summarize the following chat in 3-6 words as a short title. 
+                  Respond with only the title — no quotes, no trailing punctuation.\n\n
+                  User: ${userMessage.slice(0, 500)}\nAssistant: ${assistantMessage.slice(0, 500)}`;
+                  
   const chatUrl = getFullChatUrl(provider);
 
   const body = {

@@ -69,12 +69,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [showSettings, setShowSettings] = useState(false);
 
-  const setActiveProvider = useCallback((p: Provider | null) => {
-    setActiveProviderState(p);
-    if (p) {
-      const firstEnabled = p.models?.find((m) => m.enabled !== false)?.key;
-      setActiveModel(p.default_model || firstEnabled || '');
-      localStorage.setItem('active-provider-id', p.id);
+  const setActiveProvider = useCallback((provider: Provider | null) => {
+    setActiveProviderState(provider);
+    if (provider) {
+      const firstEnabled = provider.models?.find((model) => model.enabled !== false)?.key;
+      setActiveModel(provider.default_model || firstEnabled || '');
+      localStorage.setItem('active-provider-id', provider.id);
     } else {
       setActiveModel('');
       localStorage.removeItem('active-provider-id');

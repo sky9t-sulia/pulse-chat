@@ -8,13 +8,13 @@ export function useProviders(
 ) {
   const refreshProviders = useCallback(async () => {
     const list = await window.chatApi.providers.list();
-    const normalized = list.map((p: Provider) => ({
-      ...p,
-      models: (p.models ?? []).map((m: ProviderModel) => {
-        const info = m.model_info ?? { key: '', display_name: '' };
-        const maxCtx = info.max_context_length ?? (m.model_info as unknown as Record<string, unknown>)?.max_context_length as number | undefined;
+    const normalized = list.map((provider: Provider) => ({
+      ...provider,
+      models: (provider.models ?? []).map((providerModel: ProviderModel) => {
+        const info = providerModel.model_info ?? { key: '', display_name: '' };
+        const maxCtx = info.max_context_length ?? (providerModel.model_info as unknown as Record<string, unknown>)?.max_context_length as number | undefined;
         return {
-          ...m,
+          ...providerModel,
           model_info: maxCtx ? { ...info, max_context_length: maxCtx } : info,
         } as ProviderModel;
       }),
@@ -22,7 +22,7 @@ export function useProviders(
     setProviders(normalized as Provider[]);
     const savedId = localStorage.getItem('active-provider-id');
     if (savedId) {
-      const match = normalized.find((p) => p.id === savedId);
+      const match = normalized.find((provider) => provider.id === savedId);
       if (match) setActiveProvider(match as Provider);
     }
   }, [setActiveProvider]);

@@ -144,17 +144,17 @@ export async function streamResponse(
   }
 
   const toolCalls: ApiToolCall[] = Object.keys(toolCallsByIndex)
-    .map((k) => Number(k))
-    .sort((a, b) => a - b)
-    .map((idx) => {
-      const e = toolCallsByIndex[idx];
+    .map((indexKey) => Number(indexKey))
+    .sort((indexA, indexB) => indexA - indexB)
+    .map((index) => {
+      const toolCallEntry = toolCallsByIndex[index];
       return {
-        id: e.id || `call_${idx}`,
+        id: toolCallEntry.id || `call_${index}`,
         type: 'function' as const,
-        function: { name: e.name, arguments: e.args || '{}' },
+        function: { name: toolCallEntry.name, arguments: toolCallEntry.args || '{}' },
       } as ApiToolCall;
     })
-    .filter((tc) => tc.function.name);
+    .filter((toolCall) => toolCall.function.name);
 
   return {
     content: accumulatedContent,

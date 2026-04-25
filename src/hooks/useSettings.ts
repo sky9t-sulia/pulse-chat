@@ -3,8 +3,8 @@ import type { ThemeMode, ChatSettings } from '../types/types';
 import { CHAT_FONT_STACKS, CHAT_FONT_SIZE_STEPS } from '../context/font-config';
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
-  system_prompt: '',
-  font_family: 'system',
+  system_prompt: 'You are a helpful assistant.',
+  font_family: 'serif',
   font_size: 16,
   max_calls_per_tool: 3,
 };
@@ -62,12 +62,12 @@ export function useSettings() {
     root.style.setProperty('--chat-font-size', `${chatSettings.font_size}px`);
   }, [chatSettings]);
 
-  const setTheme = useCallback((t: ThemeMode) => {
-    setThemeState(t);
+  const setTheme = useCallback((themeMode: ThemeMode) => {
+    setThemeState(themeMode);
   }, []);
 
-  const setChatSettings = useCallback((s: ChatSettings) => {
-    setChatSettingsState(s);
+  const setChatSettings = useCallback((chatSettingsValue: ChatSettings) => {
+    setChatSettingsState(chatSettingsValue);
   }, []);
 
   return { theme, setTheme, chatSettings, setChatSettings };

@@ -6,8 +6,8 @@ interface UseChatInputArgs {
   activeConversationId: string | null;
   activeProvider: Provider | null;
   activeModel: string;
-  setActiveModel: (m: string) => void;
-  setActiveProvider: (p: Provider | null) => void;
+  setActiveModel: (model: string) => void;
+  setActiveProvider: (provider: Provider | null) => void;
   updateConversationTitle: (id: string, title: string) => Promise<void>;
   createConversation: (title: string) => Promise<{ id: string }>;
   setActiveConversationId: (id: string | null) => void;
@@ -15,14 +15,14 @@ interface UseChatInputArgs {
 
 interface UseChatInputResult {
   input: string;
-  setInput: (s: string) => void;
+  setInput: (input: string) => void;
   showProviderDropdown: boolean;
-  setShowProviderDropdown: (b: boolean) => void;
+  setShowProviderDropdown: (show: boolean) => void;
   showModelDropdown: boolean;
-  setShowModelDropdown: (b: boolean) => void;
+  setShowModelDropdown: (show: boolean) => void;
   displayModelName: () => string;
   handleModelChange: (modelKey: string) => void;
-  handleProviderSelect: (p: Provider) => void;
+  handleProviderSelect: (provider: Provider) => void;
   handleSubmit: () => Promise<void>;
   handleKeyDown: (e: React.KeyboardEvent) => void;
   availableModels: Array<{ key: string; enabled?: boolean }>;
@@ -41,12 +41,12 @@ export function useChatInput(args: UseChatInputArgs): UseChatInputResult {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const availableModels = (activeProvider?.models ?? []).filter(
-    (m) => m.enabled !== false
+    (model) => model.enabled !== false
   );
 
   const displayModelName = useCallback(() => {
     if (!activeProvider) return '';
-    const exists = (key: string) => availableModels.some((m) => m.key === key);
+    const exists = (key: string) => availableModels.some((model) => model.key === key);
     if (activeModel && exists(activeModel)) return activeModel;
     if (activeProvider.default_model && exists(activeProvider.default_model)) {
       return activeProvider.default_model;
@@ -59,8 +59,8 @@ export function useChatInput(args: UseChatInputArgs): UseChatInputResult {
     setShowModelDropdown(false);
   }, [setActiveModel]);
 
-  const handleProviderSelect = useCallback((p: Provider) => {
-    setActiveProvider(p);
+  const handleProviderSelect = useCallback((provider: Provider) => {
+    setActiveProvider(provider);
     setShowProviderDropdown(false);
   }, [setActiveProvider]);
 

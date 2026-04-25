@@ -4,10 +4,10 @@ import type { ChatFontFamily } from '../../types/types';
 import { ThemedTextarea, ThemedSelect } from '../FormInputs';
 
 const FONT_FAMILY_OPTIONS: { value: ChatFontFamily; label: string }[] = [
-  { value: 'system', label: 'System Default' },
-  { value: 'sans', label: 'Inter (Sans)' },
   { value: 'serif', label: 'Noto Serif' },
+  { value: 'sans', label: 'Inter (Sans)' },
   { value: 'mono', label: 'JetBrains Mono' },
+  { value: 'system', label: 'System Default' },
 ];
 
 export function ChatSettingsTab() {

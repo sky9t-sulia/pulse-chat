@@ -25,11 +25,11 @@ export interface FinalMessageData {
     toolInvocations?: ToolInvocation[] | null
   ) => Promise<Message>;
   updateConversationTitle: (convId: string, title: string) => Promise<void>;
-  setStreamingContent: (s: string) => void;
-  setStreamingReasoningContent: (s: string) => void;
-  setToolInvocations: (inv: ToolInvocation[]) => void;
-  setIsStreaming: (v: boolean) => void;
-  setLoadingPhase: (p: import('../../types/chat-api').LoadingPhase) => void;
+  setStreamingContent: (content: string) => void;
+  setStreamingReasoningContent: (reasoning: string) => void;
+  setToolInvocations: (invocations: ToolInvocation[]) => void;
+  setIsStreaming: (isStreaming: boolean) => void;
+  setLoadingPhase: (phase: import('../../types/chat-api').LoadingPhase) => void;
   requestStartedAt: number;
 }
 
@@ -41,8 +41,8 @@ export async function saveFinalMessage(data: FinalMessageData): Promise<void> {
     setIsStreaming, setLoadingPhase, requestStartedAt,
   } = data;
 
-  const isFirstAssistant = !messagesRef.current.some((m) => m.role === 'assistant');
-  const firstUserMsg = messagesRef.current.find((m) => m.role === 'user')?.content ?? '';
+  const isFirstAssistant = !messagesRef.current.some((message) => message.role === 'assistant');
+  const firstUserMsg = messagesRef.current.find((message) => message.role === 'user')?.content ?? '';
 
   let durationMs: number;
   if (

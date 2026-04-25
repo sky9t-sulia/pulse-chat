@@ -47,20 +47,20 @@ export function ModelDropdown({
 
       {showModelDropdown && (
         <div className="absolute bottom-full mb-2 left-0 theme-sidebar border theme-border-light rounded-lg shadow-xl py-1 min-w-[220px] max-h-[240px] overflow-y-auto z-20">
-          {availableModels.map((m) => (
+          {availableModels.map((modelItem) => (
             <button
-              key={m.key}
+              key={modelItem.key}
               className={`w-full text-left px-3 py-2 text-xs transition-colors ${
-                m.key === displayModelName
+                modelItem.key === displayModelName
                   ? 'theme-sidebar-active theme-text-primary'
                   : 'theme-text-primary hover-theme-sidebar-hover'
               }`}
-              onClick={() => onSelect(m.key)}
+              onClick={() => onSelect(modelItem.key)}
             >
-              <div className="font-medium truncate">{m.display_name || m.key}</div>
-              {m.model_info?.max_context_length && (
+              <div className="font-medium truncate">{modelItem.display_name || modelItem.key}</div>
+              {modelItem.model_info?.max_context_length && (
                 <div className="text-gray-500 text-[11px]">
-                  {Number(m.model_info.max_context_length).toLocaleString()} tokens
+                  {Number(modelItem.model_info.max_context_length).toLocaleString()} tokens
                 </div>
               )}
             </button>

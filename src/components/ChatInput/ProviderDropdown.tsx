@@ -34,13 +34,13 @@ export function ProviderDropdown({
 
       {showProviderDropdown && providers.length > 1 && (
         <div className="absolute bottom-full mb-2 left-0 theme-sidebar border theme-border-light rounded-lg shadow-xl py-1 min-w-[200px] z-10">
-          {providers.map((p) => (
+          {providers.map((providerItem) => (
             <button
-              key={p.id}
+              key={providerItem.id}
               className="w-full text-left px-3 py-2 text-xs theme-text-primary hover-theme-sidebar-hover transition-colors"
-              onClick={() => onSelect(p)}
+              onClick={() => onSelect(providerItem)}
             >
-              <div className="font-medium">{p.name}</div>
+              <div className="font-medium">{providerItem.name}</div>
             </button>
           ))}
         </div>

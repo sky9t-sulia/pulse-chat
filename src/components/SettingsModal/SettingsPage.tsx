@@ -15,7 +15,7 @@ export function SettingsPage() {
   const { setShowSettings } = useApp();
   const [tab, setTab] = useState<'providers' | 'tools' | 'chat'>('providers');
   const [closing, setClosing] = useState(false);
-  const active = tabs.find((t) => t.id === tab)!;
+  const active = tabs.find((tabItem) => tabItem.id === tab)!;
 
   const handleClose = () => {
     setClosing(true);
@@ -43,13 +43,13 @@ export function SettingsPage() {
         </div>
 
         <nav className="flex-1 py-2">
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            const isActive = tab === t.id;
+          {tabs.map((tabItem) => {
+            const Icon = tabItem.icon;
+            const isActive = tab === tabItem.id;
             return (
               <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
+                key={tabItem.id}
+                onClick={() => setTab(tabItem.id)}
                 className={`w-full flex items-center gap-2.5 px-4 py-2 text-sm transition-colors ${
                   isActive
                     ? 'theme-sidebar-active theme-text-primary font-medium'
@@ -57,7 +57,7 @@ export function SettingsPage() {
                 }`}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
-                {t.label}
+                {tabItem.label}
               </button>
             );
           })}

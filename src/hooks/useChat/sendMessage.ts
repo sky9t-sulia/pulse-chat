@@ -6,11 +6,11 @@ import { executeToolCalls } from './executeToolCalls';
 import { saveFinalMessage } from './saveFinalMessage';
 
 export interface StreamingState {
-  setStreamingContent: (s: string) => void;
-  setStreamingReasoningContent: (s: string) => void;
-  setIsStreaming: (v: boolean) => void;
-  setLoadingPhase: (p: LoadingPhase) => void;
-  setTokenStats: (s: TokenStats | null) => void;
+  setStreamingContent: (content: string) => void;
+  setStreamingReasoningContent: (reasoning: string) => void;
+  setIsStreaming: (isStreaming: boolean) => void;
+  setLoadingPhase: (phase: LoadingPhase) => void;
+  setTokenStats: (stats: TokenStats | null) => void;
   setToolInvocations: (invocations: ToolInvocation[]) => void;
 }
 
@@ -57,7 +57,7 @@ export async function sendMessage(args: SendMessageArgs) {
 
   await addMessage(convId, 'user', content, usedModel);
   const chatMessages: ApiMessage[] = [
-    ...messagesRef.current.map((m) => ({ role: m.role, content: m.content })),
+    ...messagesRef.current.map((message) => ({ role: message.role, content: message.content })),
     { role: 'user', content },
   ];
   const chatUrl = getFullChatUrl(provider);

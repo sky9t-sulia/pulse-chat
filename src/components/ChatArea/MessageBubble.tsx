@@ -37,7 +37,7 @@ export function ToolInvocationRow({ inv }: { inv: ToolInvocation }) {
     <div className="mb-2 border theme-border rounded-lg overflow-hidden">
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => setExpanded((expanded) => !expanded)}
         className="w-full flex items-center gap-2 px-3 py-2 text-left hover:theme-sidebar-hover transition-colors"
       >
         <Wrench className="w-3.5 h-3.5 theme-text-muted flex-shrink-0" />

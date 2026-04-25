@@ -59,22 +59,22 @@ export function ProvidersTab() {
               No providers configured
             </p>
           )}
-          {providers.map((provider) => {
-            const isActive = provider.id === activeProvider?.id;
+          {providers.map((providerItem) => {
+            const isActive = providerItem.id === activeProvider?.id;
             return (
             <div
-              key={provider.id}
+              key={providerItem.id}
               className={`flex hover-theme-border-light theme-border items-center gap-3 px-3 py-2.5 rounded-lg border transition-all cursor-pointer ${
                 isActive
                   ? 'bg-[color:var(--bg-sidebar)]'
                   : ''
               }`}
-              onClick={() => setActiveProvider(provider)}
+              onClick={() => setActiveProvider(providerItem)}
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm theme-text-primary font-medium">
-                    {provider.name}
+                    {providerItem.name}
                   </span>
                   <span className="text-[10px] theme-sidebar-active theme-text-secondary px-1.5 py-0.5 rounded">
                     OpenAI Compatible
@@ -87,15 +87,15 @@ export function ProvidersTab() {
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs text-gray-500 truncate">
-                    {provider.default_model}
+                    {providerItem.default_model}
                   </span>
                   <span className="text-xs theme-text-muted">{"\u2022"}</span>
                   <span className="text-xs text-gray-500 truncate">
-                    {provider.api_url.replace(/https?:\/\//, '')}
+                    {providerItem.api_url.replace(/https?:\/\//, '')}
                   </span>
                   <span className="text-xs theme-text-muted">{"\u2022"}</span>
                   <span className="text-xs text-gray-500 truncate font-mono">
-                    {provider.endpoint}
+                    {providerItem.endpoint}
                   </span>
                 </div>
               </div>
@@ -103,7 +103,7 @@ export function ProvidersTab() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setEditingProvider(provider);
+                    setEditingProvider(providerItem);
                     setShowForm(true);
                   }}
                   className="p-1 theme-text-secondary hover-theme-text-primary transition-colors"
@@ -113,7 +113,7 @@ export function ProvidersTab() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    deleteProvider(provider.id);
+                    deleteProvider(providerItem.id);
                   }}
                   className="p-1 theme-text-secondary hover:text-red-400 transition-colors"
                 >

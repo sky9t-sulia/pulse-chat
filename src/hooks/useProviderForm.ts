@@ -24,11 +24,11 @@ export interface ProviderFormState {
 
 export interface UseProviderFormResult {
   state: ProviderFormState & ModelState;
-  setName: (n: string) => void;
-  setApiUrl: (u: string) => void;
-  setApiKey: (k: string) => void;
-  setDefaultModel: (m: string) => void;
-  setShowKey: (s: boolean) => void;
+  setName: (name: string) => void;
+  setApiUrl: (apiUrl: string) => void;
+  setApiKey: (apiKey: string) => void;
+  setDefaultModel: (defaultModel: string) => void;
+  setShowKey: (showKey: boolean) => void;
   setModelEnabled: (fn: React.SetStateAction<Record<string, boolean>>) => void;
   setModelOverrides: (fn: React.SetStateAction<Record<string, { max_context?: number }>>) => void;
   setModelsListExpanded: (fn: React.SetStateAction<boolean>) => void;
@@ -72,16 +72,16 @@ export function useProviderForm(initial?: Provider): UseProviderFormResult {
       setAvailableModels(models);
       setModelEnabled((prev) => {
         const next: Record<string, boolean> = {};
-        models.forEach((m) => {
-          if (prev[m] !== undefined) next[m] = prev[m];
-          else next[m] = true;
+        models.forEach((model) => {
+          if (prev[model] !== undefined) next[model] = prev[model];
+          else next[model] = true;
         });
         return next;
       });
       setModelOverrides((prev) => {
         const next: Record<string, { max_context?: number }> = {};
-        models.forEach((m) => {
-          if (prev[m]) next[m] = prev[m];
+        models.forEach((model) => {
+          if (prev[model]) next[model] = prev[model];
         });
         return next;
       });
@@ -100,19 +100,19 @@ export function useProviderForm(initial?: Provider): UseProviderFormResult {
   useEffect(() => {
     if (!initial?.models || initial.models.length === 0) return;
 
-    const keys = initial.models.map((m) => m.key);
+    const keys = initial.models.map((model) => model.key);
     setAvailableModels(keys);
     const map: Record<string, unknown> = {};
-    initial.models.forEach((m) => {
-      map[m.key] = { key: m.key, display_name: m.display_name, model_info: m.model_info };
+    initial.models.forEach((model) => {
+      map[model.key] = { key: model.key, display_name: model.display_name, model_info: model.model_info };
     });
     setModelObjectsMap(map);
     const enabled: Record<string, boolean> = {};
     const overrides: Record<string, { max_context?: number }> = {};
-    initial.models.forEach((m) => {
-      enabled[m.key] = m.enabled !== false;
-      if (m.model_info?.max_context_length !== undefined) {
-        overrides[m.key] = { max_context: m.model_info.max_context_length };
+    initial.models.forEach((model) => {
+      enabled[model.key] = model.enabled !== false;
+      if (model.model_info?.max_context_length !== undefined) {
+        overrides[model.key] = { max_context: model.model_info.max_context_length };
       }
     });
     setModelEnabled(enabled);

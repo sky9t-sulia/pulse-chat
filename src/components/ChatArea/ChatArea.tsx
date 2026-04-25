@@ -1,6 +1,5 @@
 import { useApp } from '../../context/AppContext';
 import type { LoadingPhase } from '../../hooks/useChat';
-import type { Conversation } from '../../types/types';
 import { Plus, MessageSquare } from 'lucide-react';
 import { MessageBubble, ToolInvocationRow } from './MessageBubble';
 import { MessageContent } from './MessageContent';
@@ -65,14 +64,14 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
             <div>
               <h3 className="text-xs theme-text-muted mb-2 px-1 uppercase tracking-wide">Recent</h3>
               <div className="space-y-1">
-                {recent.map((conv: Conversation) => (
+                {recent.map((conversation) => (
                   <button
-                    key={conv.id}
-                    onClick={() => setActiveConversationId(conv.id)}
+                    key={conversation.id}
+                    onClick={() => setActiveConversationId(conversation.id)}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg theme-text-primary hover-theme-sidebar-hover transition-all text-left"
                   >
                     <MessageSquare className="w-4 h-4 flex-shrink-0 theme-text-secondary" />
-                    <span className="flex-1 text-sm truncate">{conv.title}</span>
+                    <span className="flex-1 text-sm truncate">{conversation.title}</span>
                   </button>
                 ))}
               </div>
@@ -106,7 +105,7 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
     );
   }
 
-  const activeConversation = conversations.find((c) => c.id === activeConversationId);
+  const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId);
 
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 relative">

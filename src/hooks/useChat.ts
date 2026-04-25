@@ -32,7 +32,7 @@ export function useChat() {
 
   useEffect(() => {
     if (isStreaming) return;
-    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+    const lastAssistant = [...messages].reverse().find((message) => message.role === 'assistant');
     if (lastAssistant && (lastAssistant.input_tokens || lastAssistant.output_tokens)) {
       setTokenStats({
         input_tokens: lastAssistant.input_tokens || 0,

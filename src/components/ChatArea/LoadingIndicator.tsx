@@ -23,7 +23,7 @@ export function LoadingIndicator({
     <div className="mb-6">
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => setExpanded((expanded) => !expanded)}
         className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
       >
         <div className="flex items-center gap-1.5">

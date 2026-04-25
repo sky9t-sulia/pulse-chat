@@ -18,8 +18,8 @@ export function ToolsTab() {
   const [dropIdx, setDropIdx] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const customTools = tools.filter((t) => !t.is_built_in);
-  const builtInTools = tools.filter((t) => t.is_built_in);
+  const customTools = tools.filter((tool) => !tool.is_built_in);
+  const builtInTools = tools.filter((tool) => tool.is_built_in);
 
   const openAdd = () => {
     setAddName('');
@@ -53,7 +53,7 @@ export function ToolsTab() {
 
   const handleReorder = useCallback(() => {
     if (dragIdx !== null && dropIdx !== null && dragIdx !== dropIdx) {
-      const newOrder = [...customTools.map((t) => t.id)];
+      const newOrder = [...customTools.map((tool) => tool.id)];
       const [moved] = newOrder.splice(dragIdx, 1);
       newOrder.splice(dropIdx, 0, moved);
       reorderTools(newOrder);
@@ -77,11 +77,11 @@ export function ToolsTab() {
           isDragged={isDragged}
           isDropTarget={isDropTarget}
           isCustom={isCustom}
-          setDragItem={(v) => setDragIdx(v)}
+          setDragItem={(dragItemValue) => setDragIdx(dragItemValue)}
           onToggle={() => updateTool(tool.id, { enabled: !tool.enabled })}
           onDelete={() => deleteTool(tool.id)}
           onUpdate={(data) => updateTool(tool.id, data)}
-          onModeChange={(active) => setActiveCount((n) => n + (active ? 1 : -1))}
+          onModeChange={(isActive) => setActiveCount((count) => count + (isActive ? 1 : -1))}
         />
       </div>
     );
