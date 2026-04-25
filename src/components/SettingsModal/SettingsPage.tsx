@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Server, Wrench, MessageSquare, User } from 'lucide-react';
+import { ArrowLeft, Server, Wrench, User, MessageCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ProvidersTab } from './ProvidersTab';
 import { ToolsTab } from './ToolsTab';
@@ -9,7 +9,7 @@ import { ProfileTab } from './ProfileTab';
 const tabs = [
   { id: 'providers' as const, label: 'LM Providers', icon: Server },
   { id: 'tools' as const, label: 'Tools', icon: Wrench },
-  { id: 'chat' as const, label: 'Chat Settings', icon: MessageSquare },
+  { id: 'chat' as const, label: 'Chat Settings', icon: MessageCircle },
   { id: 'profile' as const, label: 'Profile', icon: User },
 ];
 

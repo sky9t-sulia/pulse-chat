@@ -1,4 +1,4 @@
-import { Square, Send } from 'lucide-react';
+import { Square, MoveUp } from 'lucide-react';
 
 interface SendButtonProps {
   isStreaming: boolean;
@@ -15,7 +15,7 @@ export function SendButton({ isStreaming, hasInput, onSend, onStop }: SendButton
       onClick={handleClick}
       disabled={!isStreaming && !hasInput}
       title={isStreaming ? 'Stop generating' : 'Send'}
-      className={`p-2 rounded-full transition-all flex-shrink-0 ${
+      className={`p-2 rounded-md transition-all flex-shrink-0 ${
         isStreaming
           ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
           : hasInput
@@ -26,7 +26,7 @@ export function SendButton({ isStreaming, hasInput, onSend, onStop }: SendButton
       {isStreaming ? (
         <Square className="w-4 h-4 fill-current" />
       ) : (
-        <Send className="w-4 h-4" />
+        <MoveUp className="w-4 h-4" />
       )}
     </button>
   );

@@ -37,7 +37,7 @@ export default function Sidebar() {
       }`}
     >
       {/* Header */}
-      <div className={`p-2 flex items-center gap-1 ${collapsed ? 'flex-col' : ''}`}>
+      <div className={`p-2 flex items-left gap-1 ${collapsed ? 'flex-col' : ''}`}>
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="sidebar-item p-2 rounded-lg theme-text-secondary hover-theme-text-primary"
@@ -58,7 +58,7 @@ export default function Sidebar() {
 
       {/* Conversation list */}
       {!collapsed && (
-        <div className="flex-1 overflow-y-auto px-2 pb-2">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
           {conversations.length === 0 && (
             <div className="px-3 py-8 text-center">
               <p className="text-xs theme-text-tertiary">No conversations yet</p>
@@ -80,31 +80,31 @@ export default function Sidebar() {
       {collapsed && <div className="flex-1" />}
 
       {/* Footer */}
-      <div className={`${collapsed ? 'p-2 space-y-1' : 'p-3 space-y-1'}`}>
+      <div className={`p-2 ${collapsed ? 'flex items-left gap-1 flex-col' : 'space-y-1'}`}>
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className={`sidebar-item rounded-lg theme-text-secondary hover-theme-text-primary text-sm ${
+          className={`sidebar-item px-2 py-2 rounded-lg theme-text-secondary hover-theme-text-primary text-sm ${
             collapsed
-              ? 'w-full flex items-center justify-center p-2'
-              : 'w-full flex items-center gap-2 px-3 py-2'
+              ? 'rounded-lg theme-text-secondary hover-theme-text-primary'
+              : 'w-full flex items-center gap-2'
           }`}
           title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          {!collapsed && <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>}
+          {!collapsed && <span className="text-xs">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>}
         </button>
 
         <button
           onClick={() => setShowSettings(true)}
-          className={`sidebar-item rounded-lg theme-text-secondary hover-theme-text-primary text-sm ${
+          className={`sidebar-item px-2 py-2 rounded-lg theme-text-secondary hover-theme-text-primary text-sm ${
             collapsed
-              ? 'w-full flex items-center justify-center p-2'
-              : 'w-full flex items-center gap-2 px-3 py-2'
+              ? 'rounded-lg theme-text-secondary hover-theme-text-primary'
+              : 'w-full flex items-center gap-2'
           }`}
           title="Settings"
         >
           <Settings className="w-4 h-4" />
-          {!collapsed && <span>Settings</span>}
+          {!collapsed && <span className="text-xs">Settings</span>}
         </button>
       </div>
 
