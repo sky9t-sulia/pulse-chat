@@ -27,8 +27,7 @@
   --copy-btn-text: #e0ddd2;
   --copy-btn-hover-bg: #d4d0c2;
   --copy-btn-hover-text: #3d3929;
-  --modal-bg: #2a2a27;
-  --modal-bg-light: #faf9f5;
+  --active-text: #faf9f5;
   --accent: #c15f3c;
   --accent-hover: #d97757;
   --bg-chat-input: #30302d;
@@ -59,8 +58,7 @@
   --copy-btn-text: #f8f8f6;
   --copy-btn-hover-bg: #dcdcda;
   --copy-btn-hover-text: #121212;
-  --modal-bg: #2a2a27;
-  --modal-bg-light: #f8f8f6;
+  --active-text: #f8f8f6;
   --accent: #c15f3c;
   --accent-hover: #b04e2d;
   --bg-chat-input: #ffffff;
@@ -297,32 +295,6 @@ body {
 .settings-exit {
   animation: settings-exit 0.15s ease-in forwards;
   pointer-events: none;
-}
-
-
-/* ─── Settings modal ──────────────────────────────────────── */
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.modal-content {
-  background: var(--modal-bg);
-  border-radius: 12px;
-  padding: 24px;
-  width: 640px;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-.light .modal-content {
-  background: var(--modal-bg-light);
 }
 
 /* ─── Input area ──────────────────────────────────────────── */

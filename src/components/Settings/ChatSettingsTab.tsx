@@ -2,6 +2,7 @@ import { useApp } from '../../context/AppContext';
 import { CHAT_FONT_STACKS, CHAT_FONT_SIZE_STEPS } from '../../context/font-config';
 import type { ChatFontFamily } from '../../types/types';
 import { ThemedTextarea, ThemedSelect } from '../FormInputs';
+import { SectionLabel } from './SectionLabel';
 
 const FONT_FAMILY_OPTIONS: { value: ChatFontFamily; label: string }[] = [
   { value: 'serif', label: 'Noto Serif' },
@@ -20,24 +21,24 @@ export function ChatSettingsTab() {
   );
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between mb-10">
+    <>
+      <div className="flex items-center justify-between">
       </div>
       <div>
-        <label className="block text-xs text-gray-400 mb-1">System Prompt</label>
+        <SectionLabel>System Prompt</SectionLabel>
         <ThemedTextarea
           value={chatSettings.system_prompt}
           onChange={(e) => setChatSettings({ ...chatSettings, system_prompt: e.target.value })}
           placeholder="Optional — sent as the system message on every request."
           className="resize-y h-24"
         />
-        <p className="text-xs theme-text-muted mt-1">
+        <p className="text-xs theme-text-muted">
           Applied to new messages in every conversation.
         </p>
       </div>
 
-      <div>
-        <label className="block text-xs text-gray-400 mb-1">Font</label>
+      <div className="mt-8">
+        <SectionLabel>Font</SectionLabel>
         <ThemedSelect
           value={chatSettings.font_family}
           onChange={(e) =>
@@ -54,16 +55,16 @@ export function ChatSettingsTab() {
           ))}
         </ThemedSelect>
         <p
-          className="text-xs theme-text-muted mt-2"
+          className="text-xs theme-text-muted mt-1"
           style={{ fontFamily: CHAT_FONT_STACKS[chatSettings.font_family] }}
         >
           The quick brown fox jumps over the lazy dog.
         </p>
       </div>
 
-      <div>
+      <div className="mt-8">
         <div className="flex items-center justify-between mb-1">
-          <label className="block text-xs text-gray-400">Font Size</label>
+          <SectionLabel>Font Size</SectionLabel>
           <span className="text-xs theme-text-secondary font-mono">
             {chatSettings.font_size}px
           </span>
@@ -89,9 +90,9 @@ export function ChatSettingsTab() {
         </div>
       </div>
 
-      <div>
+      <div className="mt-8">
         <div className="flex items-center justify-between mb-1">
-          <label className="block text-xs text-gray-400">Max tool calls per message</label>
+          <SectionLabel>Max tool calls per message</SectionLabel>
           <span className="text-xs theme-text-secondary font-mono">
             {chatSettings.max_calls_per_tool}
           </span>
@@ -110,10 +111,10 @@ export function ChatSettingsTab() {
           }
           className="w-full accent-gray-500"
         />
-        <p className="text-xs theme-text-muted mt-1">
+        <p className="text-xs theme-text-muted">
           How many times the model can call the same tool in one turn before it&apos;s asked to answer with what it has.
         </p>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,8 +1,7 @@
-import { Save, X } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { ThemedInput, ThemedTextarea } from '../FormInputs';
 
 interface Props {
-  title: string;
   name: string;
   description: string;
   parameters: string;
@@ -19,7 +18,6 @@ interface Props {
 }
 
 export function ToolsTabForm({
-  title,
   name,
   description,
   parameters,
@@ -37,18 +35,7 @@ export function ToolsTabForm({
   const inputClass = readOnly ? 'bg-theme-input cursor-not-allowed' : '';
 
   return (
-    <div className="border theme-border-light rounded-lg p-4 mb-3">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-xs font-mono theme-text-primary font-medium">{title}</h4>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="theme-text-secondary hover-theme-text-primary transition-colors"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
-      </div>
-      <form onSubmit={onSubmit} className="space-y-3">
+    <form onSubmit={onSubmit} className="space-y-3">
         <div>
           <label className="block text-xs text-gray-400 mb-1">Name</label>
           <ThemedInput
@@ -118,6 +105,5 @@ export function ToolsTabForm({
           )}
         </div>
       </form>
-    </div>
   );
 }

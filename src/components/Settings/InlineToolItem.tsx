@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import { Wrench, Eye, Pencil, Trash2, GripVertical } from 'lucide-react';
 import type { Tool } from '../../types/types';
-import { ToolsTabForm } from './ToolsTabForm';
 
 interface InlineToolItemProps {
   tool: Tool;
@@ -12,85 +10,14 @@ interface InlineToolItemProps {
   setDragItem: (v: number | null) => void;
   onToggle: () => void;
   onDelete: () => void;
-  onUpdate: (data: Partial<Omit<Tool, 'id' | 'created_at' | 'updated_at'>>) => void;
-  onModeChange: (active: boolean) => void;
+  onEdit: () => void;
+  onView: () => void;
 }
 
 export function InlineToolItem({
   tool, index, isDragged, isDropTarget, isCustom,
-  setDragItem, onToggle, onDelete, onUpdate, onModeChange,
+  setDragItem, onToggle, onDelete, onEdit, onView,
 }: InlineToolItemProps) {
-  const [mode, setMode] = useState<'row' | 'edit' | 'view'>('row');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [parameters, setParameters] = useState('');
-  const [handlerCode, setHandlerCode] = useState('');
-  const [paramError, setParamError] = useState<string | null>(null);
-
-  const changeMode = (next: 'row' | 'edit' | 'view') => {
-    const wasActive = mode !== 'row';
-    const willBeActive = next !== 'row';
-    if (wasActive !== willBeActive) onModeChange(willBeActive);
-    setMode(next);
-  };
-
-  const startEdit = () => {
-    setName(tool.name);
-    setDescription(tool.description);
-    setParameters(JSON.stringify(tool.parameters, null, 2));
-    setHandlerCode(tool.handler_code || '');
-    setParamError(null);
-    changeMode('edit');
-  };
-
-  const cancel = () => {
-    changeMode('row');
-    setParamError(null);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setParamError(null);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(parameters);
-    } catch {
-      setParamError('Invalid JSON in parameters');
-      return;
-    }
-    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-      (parsed as Record<string, unknown>).type = (parsed as Record<string, unknown>).type || 'object';
-    } else {
-      setParamError('Parameters must be a JSON object with type: "object"');
-      return;
-    }
-    onUpdate({ name, description, parameters: parsed as Record<string, unknown>, handler_code: handlerCode });
-    changeMode('row');
-  };
-
-  const isView = mode === 'view';
-
-  if (mode !== 'row') {
-    return (
-      <ToolsTabForm
-        title={isView ? tool.name : 'Edit Tool'}
-        name={isView ? tool.name : name}
-        description={isView ? tool.description : description}
-        parameters={isView ? JSON.stringify(tool.parameters, null, 2) : parameters}
-        handlerCode={isView ? (tool.handler_code || '') : handlerCode}
-        paramError={paramError}
-        readOnly={isView}
-        onChangeName={(e) => setName(e.target.value)}
-        onChangeDescription={(e) => setDescription(e.target.value)}
-        onChangeParameters={(e) => { setParameters(e.target.value); setParamError(null); }}
-        onChangeHandlerCode={(e) => setHandlerCode(e.target.value)}
-        onSubmit={isView ? undefined : handleSubmit}
-        onCancel={cancel}
-        submitLabel="Update"
-      />
-    );
-  }
-
   return (
     <>
       {isDropTarget && !isDragged && (
@@ -139,7 +66,7 @@ export function InlineToolItem({
               </button>
               <button
                 type="button"
-                onClick={() => changeMode('view')}
+                onClick={onView}
                 className="p-1 theme-text-secondary hover-theme-text-primary transition-colors"
                 title="View tool structure"
               >
@@ -150,7 +77,7 @@ export function InlineToolItem({
             <>
               <button
                 type="button"
-                onClick={startEdit}
+                onClick={onEdit}
                 className="p-1 theme-text-secondary hover-theme-text-primary transition-colors"
                 title="Edit"
               >

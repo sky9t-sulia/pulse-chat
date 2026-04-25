@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ThemedInput, ThemedSelect, ThemedTextarea } from '../FormInputs';
+import { SectionLabel } from './SectionLabel';
 
 const GENDERS = [
   { value: '', label: 'Prefer not to say' },
@@ -20,9 +21,11 @@ export function ProfileTab() {
   }, [name, bio, gender, updateUserSettings]);
 
   return (
-    <div className="space-y-5">
+    <>
+      <div className="flex items-center justify-between">
+      </div>
       <div>
-        <label className="block text-xs text-gray-400 mb-1">Name</label>
+        <SectionLabel>Name</SectionLabel>
         <ThemedInput
           type="text"
           value={name}
@@ -32,8 +35,8 @@ export function ProfileTab() {
         />
       </div>
 
-      <div>
-        <label className="block text-xs text-gray-400 mb-1">Gender</label>
+      <div className='mt-8'>
+        <SectionLabel>Gender</SectionLabel>
         <ThemedSelect value={gender} onChange={(e) => setGender(e.target.value)} onBlur={handleSave}>
           {GENDERS.map((g) => (
             <option key={g.value} value={g.value}>
@@ -43,8 +46,8 @@ export function ProfileTab() {
         </ThemedSelect>
       </div>
 
-      <div>
-        <label className="block text-xs text-gray-400 mb-1">Bio / Interests</label>
+      <div className='mt-8'>
+        <SectionLabel>Bio / Interests</SectionLabel>
         <ThemedTextarea
           value={bio}
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setBio(e.target.value)}
@@ -52,10 +55,10 @@ export function ProfileTab() {
           placeholder="e.g. Software developer, into AI and music"
           className="resize-y h-20"
         />
-        <p className="text-xs theme-text-muted mt-1">
+        <p className="text-xs theme-text-muted">
           Used for personalization. Not yet implemented.
         </p>
       </div>
-    </div>
+    </>
   );
 }

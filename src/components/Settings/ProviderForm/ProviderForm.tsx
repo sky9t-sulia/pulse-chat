@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import { Eye, EyeOff, Save } from 'lucide-react';
 import { joinUrl } from '../../../helpers/url';
 import { ThemedInput } from '../../FormInputs';
@@ -26,7 +25,7 @@ export function ProviderForm({
 
   const { name, apiUrl, apiKey, defaultModel, showKey, availableModels, isFetchingModels, modelFetchError, modelObjectsMap, modelOverrides, modelEnabled, modelsListExpanded } = state;
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const modelsList = buildModelsList(
       availableModels, modelObjectsMap, modelOverrides, modelEnabled, defaultModel
@@ -42,7 +41,7 @@ export function ProviderForm({
       model_info: null,
       models: modelsList,
     });
-  }, [name, apiUrl, apiKey, defaultModel, availableModels, modelObjectsMap, modelOverrides, modelEnabled, initial, onSave]);
+  };
 
   const fullUrl = apiUrl && '/v1/chat/completions' ? joinUrl(apiUrl, '/v1/chat/completions') : null;
 
