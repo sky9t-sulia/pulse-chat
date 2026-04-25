@@ -112,4 +112,4 @@ Built files go into `dist/` (web) or `release/` (desktop packages).
 
 ## License
 
-Licensed under the [GNU GPLv2](LICENSE) license.
+Licensed under the [GNU GPLv3](LICENSE) license.
