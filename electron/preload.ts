@@ -138,6 +138,18 @@ const chatApi = {
       ipcRenderer.invoke('tools:execute', toolName, toolArgsJson) as Promise<ToolResult>,
     reorder: (order: string[]) => ipcRenderer.invoke('tools:reorder', order),
   },
+  user: {
+    get: () =>
+      ipcRenderer.invoke('user:get') as Promise<{
+        id: string | null;
+        name: string;
+        bio: string;
+        gender: string;
+        onboardingComplete: boolean;
+      }>,
+    update: (user: { name: string; bio: string; gender: string }) =>
+      ipcRenderer.invoke('user:update', user),
+  },
 };
 
 contextBridge.exposeInMainWorld('chatApi', chatApi);

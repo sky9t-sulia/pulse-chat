@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Server, Wrench, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Server, Wrench, MessageSquare, User } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ProvidersTab } from './ProvidersTab';
 import { ToolsTab } from './ToolsTab';
 import { ChatSettingsTab } from './ChatSettingsTab';
+import { ProfileTab } from './ProfileTab';
 
 const tabs = [
   { id: 'providers' as const, label: 'LM Providers', icon: Server },
   { id: 'tools' as const, label: 'Tools', icon: Wrench },
   { id: 'chat' as const, label: 'Chat Settings', icon: MessageSquare },
+  { id: 'profile' as const, label: 'Profile', icon: User },
 ];
 
 export function SettingsPage() {
   const { setShowSettings } = useApp();
-  const [tab, setTab] = useState<'providers' | 'tools' | 'chat'>('providers');
+  const [tab, setTab] = useState<'providers' | 'tools' | 'chat' | 'profile'>('providers');
   const [closing, setClosing] = useState(false);
   const active = tabs.find((tabItem) => tabItem.id === tab)!;
 
@@ -76,7 +78,7 @@ export function SettingsPage() {
         <div className="pt-4 px-8 pb-6 max-w-3xl w-full mx-auto">
           <h2 className="text-sm font-medium theme-text-heading">{active.label}</h2>
           <>
-            {tab === 'providers' ? <ProvidersTab /> : tab === 'tools' ? <ToolsTab /> : <ChatSettingsTab />}
+            {tab === 'providers' ? <ProvidersTab /> : tab === 'tools' ? <ToolsTab /> : tab === 'chat' ? <ChatSettingsTab /> : <ProfileTab />}
           </>
         </div>
       </div>

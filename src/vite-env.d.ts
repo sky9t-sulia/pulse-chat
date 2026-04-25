@@ -104,6 +104,10 @@ interface ChatAPI {
     execute: (toolName: string, toolArgsJson: string) => Promise<ToolResult>;
     reorder: (order: string[]) => Promise<void>;
   };
+  user: {
+    get: () => Promise<{ id: string | null; name: string; bio: string; gender: string; onboardingComplete: boolean }>;
+    update: (user: { name: string; bio: string; gender: string }) => Promise<void>;
+  };
 }
 
 interface Tool {

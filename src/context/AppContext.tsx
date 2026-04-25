@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import type { Conversation, Message, Provider, ToolInvocationRecord } from '../types/types';
+import type { Conversation, Message, Provider, ToolInvocationRecord, UserSettings } from '../types/types';
 import { getFullChatUrl } from '../helpers/url';
 import { useSettings } from '../hooks/useSettings';
 import { useConversations } from '../hooks/useConversations';
 import { useMessages } from '../hooks/useMessages';
 import { useProviders } from '../hooks/useProviders';
+import { useUserSettings } from '../hooks/useUserSettings';
 
 export { getFullChatUrl };
 
@@ -16,6 +17,8 @@ interface AppContextType {
   activeProvider: Provider | null;
   activeModel: string;
   setActiveModel: (modelKey: string) => void;
+  userSettings: UserSettings;
+  updateUserSettings: (updates: { name: string; bio: string; gender: string }) => void;
   theme: 'dark' | 'light';
   setTheme: (theme: 'dark' | 'light') => void;
   chatSettings: import('../types/types').ChatSettings;
@@ -66,6 +69,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeModel, setActiveModel] = useState<string>('');
 
   const { theme, setTheme, chatSettings, setChatSettings } = useSettings();
+  const { userSettings, updateUserSettings } = useUserSettings();
 
   const [showSettings, setShowSettings] = useState(false);
 
@@ -112,6 +116,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     activeProvider,
     activeModel,
     setActiveModel,
+    userSettings,
+    updateUserSettings,
     theme,
     setTheme,
     chatSettings,

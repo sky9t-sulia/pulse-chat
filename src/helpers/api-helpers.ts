@@ -1,6 +1,6 @@
-import { composeSystemPrompt } from './system-prompt';
+import { composeSystemPrompt, type UserContext } from './system-prompt';
 import type { Provider } from '../types/types';
-import type { ApiMessage } from '../types/chat-api';
+import type { ApiMessage } from '../types/streaming-api';
 import { getFullChatUrl } from './url';
 
 export function buildRequestBody(
@@ -9,8 +9,9 @@ export function buildRequestBody(
   userSystemPrompt: string,
   previousResponseId?: string,
   tools?: Record<string, unknown>[],
+  userContext?: UserContext,
 ): Record<string, unknown> {
-  const systemPrompt = composeSystemPrompt(userSystemPrompt);
+  const systemPrompt = composeSystemPrompt(userSystemPrompt, userContext);
   const withSystem: ApiMessage[] = systemPrompt
     ? [{ role: 'system', content: systemPrompt }, ...messages]
     : messages;

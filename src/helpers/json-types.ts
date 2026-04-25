@@ -1,4 +1,4 @@
-import type { TokenStats } from '../types/chat-api';
+import type { TokenStats } from '../types/streaming-api';
 
 export interface JsonDelta {
   content?: string;

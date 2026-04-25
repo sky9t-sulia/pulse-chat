@@ -1,10 +1,10 @@
-import type { ApiMessage, ApiToolCall, TokenStats } from '../../types/chat-api';
+import type { ApiMessage, ApiToolCall, TokenStats } from '../../types/streaming-api';
 import { buildRequestBody } from '../../helpers/api-helpers';
 import { buildThinkBuffer } from '../../helpers/think-buffer';
 import type { JsonChunk } from '../../helpers/json-types';
-import type { StreamState } from '../../helpers/stream-handler';
-import type { StreamingCallbacks } from '../../types/chat-api';
-import { handleJsonChunk } from '../../helpers/stream-handler';
+import { handleJsonChunk, type StreamState } from '../../helpers/stream-handler';
+import type { StreamingCallbacks } from '../../types/streaming-api';
+import type { UserContext } from '../../helpers/system-prompt';
 
 interface StreamResult {
   content: string;
@@ -26,6 +26,7 @@ export async function streamResponse(
   responseIdRef: Record<string, string>,
   cancelRef: React.MutableRefObject<(() => void) | null>,
   callbacks: StreamingCallbacks,
+  userContext?: UserContext,
 ): Promise<StreamResult> {
   const streamBody = buildRequestBody(
     model,
@@ -33,6 +34,7 @@ export async function streamResponse(
     userSystemPrompt,
     responseIdRef[streamConvId],
     tools,
+    userContext,
   );
 
   let accumulatedContent = '';

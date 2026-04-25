@@ -1,5 +1,5 @@
 import type { Message } from '../../types/types';
-import type { TokenStats, ToolInvocation } from '../../types/chat-api';
+import type { TokenStats, ToolInvocation } from '../../types/streaming-api';
 import { generateTitle } from '../../helpers/api-helpers';
 import type { Provider } from '../../types/types';
 
@@ -29,7 +29,7 @@ export interface FinalMessageData {
   setStreamingReasoningContent: (reasoning: string) => void;
   setToolInvocations: (invocations: ToolInvocation[]) => void;
   setIsStreaming: (isStreaming: boolean) => void;
-  setLoadingPhase: (phase: import('../../types/chat-api').LoadingPhase) => void;
+  setLoadingPhase: (phase: import('../../types/streaming-api').LoadingPhase) => void;
   requestStartedAt: number;
 }
 

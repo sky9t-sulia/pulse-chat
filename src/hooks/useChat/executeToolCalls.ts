@@ -1,4 +1,4 @@
-import type { ToolInvocation, ApiMessage, ApiToolCall } from '../../types/chat-api';
+import type { ToolInvocation, ApiMessage, ApiToolCall } from '../../types/streaming-api';
 
 export interface ToolCallResult {
   toolCalls: ApiToolCall[];

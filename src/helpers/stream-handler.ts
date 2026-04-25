@@ -1,4 +1,4 @@
-import type { TokenStats, StreamingCallbacks } from '../types/chat-api';
+import type { TokenStats, StreamingCallbacks } from '../types/streaming-api';
 import type { JsonChunk } from './json-types';
 import { parseUsage } from './json-types';
 

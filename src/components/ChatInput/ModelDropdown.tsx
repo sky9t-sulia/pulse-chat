@@ -46,7 +46,7 @@ export function ModelDropdown({
       </button>
 
       {showModelDropdown && (
-        <div className="absolute bottom-full mb-2 left-0 theme-sidebar border theme-border-light rounded-lg shadow-xl py-1 min-w-[220px] max-h-[240px] overflow-y-auto z-20">
+        <div className="absolute bottom-full mb-2 left-0 theme-sidebar border theme-border-light rounded-lg shadow-xl py-0 min-w-[220px] max-h-[240px] overflow-y-auto z-20">
           {availableModels.map((modelItem) => (
             <button
               key={modelItem.key}

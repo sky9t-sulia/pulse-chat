@@ -27,8 +27,23 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
     createConversation,
     setActiveConversationId,
     activeProvider,
+    userSettings,
   } = useApp();
   const showLoading = isStreaming && !streamingContent;
+
+  function getGreeting() {
+    const hour = new Date().getHours();
+    let timeGreeting: string;
+    if (hour < 6) timeGreeting = 'Good night';
+    else if (hour < 12) timeGreeting = 'Good morning';
+    else if (hour < 18) timeGreeting = 'Good afternoon';
+    else timeGreeting = 'Good evening';
+
+    if (userSettings.name) {
+      return `${timeGreeting}, ${userSettings.name}!`;
+    }
+    return timeGreeting;
+  }
 
   if (!activeConversationId) {
     const recent = conversations.slice(0, 5);
@@ -40,8 +55,8 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
     return (
       <div className="flex-1 flex items-center justify-center px-6">
         <div className="w-full max-w-xl">
-          <h1 className="text-3xl font-semibold theme-text-heading mb-2 text-center">
-            What can I help with?
+          <h1 className="text-3xl font-semibold theme-text-heading mb-2 text-center font-serif">
+            {getGreeting()}
           </h1>
           <p className="text-sm theme-text-muted text-center mb-8">
             {activeProvider ? (
@@ -86,8 +101,8 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center max-w-md px-6">
-          <h1 className="text-2xl font-medium theme-text-heading mb-3">
-            What can I help with?
+          <h1 className="text-2xl font-medium theme-text-heading mb-3 font-serif">
+            {getGreeting()}
           </h1>
           <p className="text-sm theme-text-muted">
             Start a conversation by typing a message below.

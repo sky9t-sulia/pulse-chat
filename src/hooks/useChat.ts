@@ -2,14 +2,14 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToolRegistry } from '../context/tools';
 import type { Provider } from '../types/types';
-import type { LoadingPhase, TokenStats, ToolInvocation } from '../types/chat-api';
+import type { LoadingPhase, TokenStats, ToolInvocation } from '../types/streaming-api';
 import { sendMessage } from './useChat/sendMessage';
 import { resendOrRegenerate } from './useChat/resendOrRegenerate';
 
 export type { LoadingPhase, TokenStats, ToolInvocation };
 
 export function useChat() {
-  const { messages, activeConversationId, addMessage, deleteMessage, chatSettings, updateConversationTitle } = useApp();
+  const { messages, activeConversationId, addMessage, deleteMessage, chatSettings, updateConversationTitle, userSettings } = useApp();
   const { toolDefinitions } = useToolRegistry();
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingReasoningContent, setStreamingReasoningContent] = useState('');
@@ -68,6 +68,7 @@ export function useChat() {
         isStreaming: isStreamingRef.current,
         addMessage,
         chatSettings,
+        userContext: { name: userSettings.name, gender: userSettings.gender, bio: userSettings.bio },
         toolDefinitions,
         updateConversationTitle,
         messagesRef,

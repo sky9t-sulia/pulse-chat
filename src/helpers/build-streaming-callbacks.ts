@@ -1,4 +1,4 @@
-import type { LoadingPhase, TokenStats, ToolInvocation, StreamingCallbacks } from '../types/chat-api';
+import type { LoadingPhase, TokenStats, ToolInvocation, StreamingCallbacks } from '../types/streaming-api';
 
 export function buildStreamingCallbacks(streamingState: {
   setStreamingContent: (content: string) => void;

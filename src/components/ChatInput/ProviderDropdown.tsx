@@ -33,7 +33,7 @@ export function ProviderDropdown({
       </button>
 
       {showProviderDropdown && providers.length > 1 && (
-        <div className="absolute bottom-full mb-2 left-0 theme-sidebar border theme-border-light rounded-lg shadow-xl py-1 min-w-[200px] z-10">
+        <div className="absolute bottom-full mb-2 left-0 theme-sidebar border theme-border-light rounded-lg shadow-xl py-0 min-w-[200px] z-10">
           {providers.map((providerItem) => (
             <button
               key={providerItem.id}

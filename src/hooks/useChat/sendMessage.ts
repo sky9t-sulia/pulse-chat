@@ -1,9 +1,10 @@
 import type { Provider, Message } from '../../types/types';
-import type { LoadingPhase, ApiMessage, ApiToolCall, TokenStats, ToolInvocation } from '../../types/chat-api';
+import type { LoadingPhase, ApiMessage, ApiToolCall, TokenStats, ToolInvocation } from '../../types/streaming-api';
 import { getFullChatUrl } from '../../helpers/url';
 import { buildStreamingCallbacks } from '../../helpers/build-streaming-callbacks';
 import { executeToolCalls } from './executeToolCalls';
 import { saveFinalMessage } from './saveFinalMessage';
+import type { UserContext } from '../../helpers/system-prompt';
 
 export interface StreamingState {
   setStreamingContent: (content: string) => void;
@@ -34,6 +35,7 @@ export interface SendMessageArgs {
     toolInvocations?: ToolInvocation[] | null
   ) => Promise<Message>;
   chatSettings: { system_prompt: string; max_calls_per_tool?: number };
+  userContext?: UserContext;
   toolDefinitions: unknown[] | null;
   updateConversationTitle: (convId: string, title: string) => Promise<void>;
   messagesRef: React.MutableRefObject<Message[]>;
@@ -46,7 +48,7 @@ export async function sendMessage(args: SendMessageArgs) {
   const {
     content, provider, model, conversationIdOverride,
     activeConversationId, isStreaming, addMessage, chatSettings,
-    toolDefinitions, updateConversationTitle, messagesRef, responseIdRef,
+    userContext, toolDefinitions, updateConversationTitle, messagesRef, responseIdRef,
     streamingState, cancelRef,
   } = args;
 
@@ -95,6 +97,7 @@ export async function sendMessage(args: SendMessageArgs) {
       responseIdRef.current,
       cancelRef,
       callbacks,
+      userContext,
     );
   };
 

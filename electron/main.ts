@@ -67,6 +67,16 @@ async function initDatabase() {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT '',
+      bio TEXT NOT NULL DEFAULT '',
+      gender TEXT NOT NULL DEFAULT '',
+      onboarding_complete INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL DEFAULT 0
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
   `);
 
@@ -149,6 +159,18 @@ async function initDatabase() {
     existing.forEach((row, i) => {
       run(`UPDATE tools SET sort_order = ? WHERE id = ?`, [i, row.id]);
     });
+  } catch {
+    // Column already exists or migration not needed
+  }
+
+  // Migration: add created_at and updated_at columns to users if they don't exist yet
+  try {
+    db.run(`ALTER TABLE users ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    // Column already exists or migration not needed
+  }
+  try {
+    db.run(`ALTER TABLE users ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0`);
   } catch {
     // Column already exists or migration not needed
   }
@@ -663,3 +685,47 @@ ipcMain.handle('tools:reorder', (_e, order: string[]) => {
   });
   saveDb();
 });
+
+// ─── User ────────────────────────────────────────────────────
+
+ipcMain.handle('user:get', () => {
+  const rows = query<any>(`SELECT * FROM users LIMIT 1`);
+  if (rows.length > 0) {
+    const row = rows[0];
+    return {
+      id: row.id,
+      name: row.name || '',
+      bio: row.bio || '',
+      gender: row.gender || '',
+      onboardingComplete: row.onboarding_complete === 1,
+    };
+  }
+  return {
+    id: null,
+    name: '',
+    bio: '',
+    gender: '',
+    onboardingComplete: false,
+  };
+});
+
+ipcMain.handle(
+  'user:update',
+  (_e, user: { name: string; bio: string; gender: string }) => {
+    const rows = query<any>(`SELECT id FROM users LIMIT 1`);
+    const now = Date.now();
+    if (rows.length > 0) {
+      run(
+        'UPDATE users SET name = ?, bio = ?, gender = ?, onboarding_complete = 1, updated_at = ? WHERE id = ?',
+        [user.name, user.bio, user.gender, now, rows[0].id]
+      );
+    } else {
+      const id = uuidv4();
+      run(
+        'INSERT INTO users (id, name, bio, gender, onboarding_complete, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)',
+        [id, user.name, user.bio, user.gender, now, now]
+      );
+    }
+    saveDb();
+  }
+);

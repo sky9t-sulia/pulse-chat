@@ -1,9 +1,11 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useApp } from './context/AppContext';
 import { useChat } from './hooks/useChat';
+import { useUserSettings } from './hooks/useUserSettings';
 import Sidebar from './components/Sidebar/Sidebar';
 import ChatArea from './components/ChatArea/ChatArea';
 import ChatInput from './components/ChatInput/ChatInput';
+import OnboardingModal from './components/OnboardingModal';
 import { SettingsPage } from './components/SettingsModal/SettingsPage';
 import type { Provider } from './types/types';
 
@@ -74,6 +76,7 @@ function ChatContainer() {
 export default function App() {
   const { activeConversationId, messages, showSettings } = useApp();
   const firstMessageHandled = useRef(false);
+  const { userSettings, updateUserSettings, loading } = useUserSettings();
 
   useEffect(() => {
     if (
@@ -94,6 +97,11 @@ export default function App() {
     <div className="flex h-screen theme-main theme-text-primary">
       <Sidebar />
       {showSettings ? <SettingsPage /> : <ChatContainer />}
+      {!loading && !userSettings.onboardingComplete && (
+        <OnboardingModal
+          onComplete={(name, bio, gender) => updateUserSettings({ name, bio, gender })}
+        />
+      )}
     </div>
   );
 }

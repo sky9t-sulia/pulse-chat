@@ -107,6 +107,14 @@ export interface ToolResult {
   duration_ms: number;
 }
 
+export interface UserSettings {
+  id: string | null;
+  name: string;
+  bio: string;
+  gender: string;
+  onboardingComplete: boolean;
+}
+
 export interface ChatAPI {
   conversations: {
     list: () => Promise<Conversation[]>;
@@ -145,5 +153,9 @@ export interface ChatAPI {
     update: (id: string, tool: Partial<Omit<Tool, 'id' | 'created_at' | 'updated_at'>>) => Promise<void>;
     delete: (id: string) => Promise<void>;
     execute: (toolName: string, toolArgsJson: string) => Promise<ToolResult>;
+  };
+  user: {
+    get: () => Promise<UserSettings>;
+    update: (user: { name: string; bio: string; gender: string }) => Promise<void>;
   };
 }

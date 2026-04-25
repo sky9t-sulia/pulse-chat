@@ -7,8 +7,27 @@ export const BASE_SYSTEM_PROMPT = [
   '- Keep answers concise by default; expand only when the user asks for detail.',
 ].join('\n');
 
-export function composeSystemPrompt(userPrompt: string): string {
-  const trimmed = userPrompt.trim();
-  if (!trimmed) return BASE_SYSTEM_PROMPT;
-  return `${BASE_SYSTEM_PROMPT}\n\n---\n\n${trimmed}`;
+export interface UserContext {
+  name: string;
+  gender: string;
+  bio: string;
+}
+
+export function composeSystemPrompt(userPrompt: string, userContext?: UserContext): string {
+  const parts = [BASE_SYSTEM_PROMPT];
+
+  if (userContext && (userContext.name || userContext.gender || userContext.bio)) {
+    const contextLines: string[] = ['Knowledge about the user:'];
+    if (userContext.name) contextLines.push(`- Their name is ${userContext.name}.`);
+    if (userContext.gender) contextLines.push(`- Their gender is ${userContext.gender}.`);
+    if (userContext.bio) contextLines.push(`- About them: ${userContext.bio}`);
+    parts.push(contextLines.join('\n'));
+  }
+
+  const trimmed = userPrompt?.trim();
+  if (trimmed) {
+    parts.push(trimmed);
+  }
+
+  return parts.filter(Boolean).join('\n\n---\n\n');
 }
