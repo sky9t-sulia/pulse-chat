@@ -8,6 +8,14 @@ Whether you're connecting to a local Ollama instance, an OpenRouter gateway, or 
 
 ---
 
+## Screenshots
+
+| Pulse | Pulse (Dark) |
+|-------|--------------|
+| ![Pulse](docs/img/im1.png) | ![Pulse (Dark)](docs/img/im2.png) |
+
+---
+
 ## Key Features
 
 - **Local-first architecture** — All data stored in a local SQLite database. Conversations, messages, provider configs, and tools never leave your machine.
