@@ -7,6 +7,12 @@
   --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
 }
 
+@layer base {
+  button {
+    cursor: pointer;
+  }
+}
+
 /* ─── Base styles ─────────────────────────────────────────── */
 
 :root {
