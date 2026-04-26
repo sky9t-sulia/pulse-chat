@@ -99,7 +99,7 @@ const markdownComponents: Components = {
   ),
   img: ({ ...props }: any) => (
     <img
-      className="max-w-full rounded-lg my-4 shadow-sm"
+      className="max-w-full rounded-lg my-4 shadow-xs"
       {...props}
     />
   ),

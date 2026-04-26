@@ -59,7 +59,7 @@ export function InlineToolItem({
                 title={tool.enabled ? 'Disable' : 'Enable'}
               >
                 <span
-                  className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${
+                  className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform ${
                     tool.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
                   }`}
                 />
@@ -94,7 +94,7 @@ export function InlineToolItem({
                 title={tool.enabled ? 'Disable' : 'Enable'}
               >
                 <span
-                  className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${
+                  className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform ${
                     tool.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
                   }`}
                 />
