@@ -97,7 +97,7 @@ export function ToolsTabForm({
           {!readOnly && onSubmit && (
             <button
               type="submit"
-              className="px-4 py-2 text-sm bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors flex items-center gap-1"
+              className="px-4 py-2 text-sm bg-(--accent) hover:bg-(--accent-hover) text-white rounded-lg transition-colors flex items-center gap-1"
             >
               <Save className="w-3.5 h-3.5" />
               {submitLabel}

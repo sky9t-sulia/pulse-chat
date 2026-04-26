@@ -39,9 +39,9 @@ export function ModelDropdown({
         <span className="text-gray-500">model:</span>
         <span className="font-mono truncate max-w-[180px]">{displayModelName}</span>
         {showModelDropdown ? (
-          <ChevronUp className="w-3 h-3 flex-shrink-0" />
+          <ChevronUp className="w-3 h-3 shrink-0" />
         ) : (
-          <ChevronDown className="w-3 h-3 flex-shrink-0" />
+          <ChevronDown className="w-3 h-3 shrink-0" />
         )}
       </button>
 

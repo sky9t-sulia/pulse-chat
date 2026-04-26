@@ -40,7 +40,7 @@ export function ToolInvocationRow({ inv }: { inv: ToolInvocation }) {
         onClick={() => setExpanded((expanded) => !expanded)}
         className="w-full flex items-center gap-2 px-3 py-2 text-left hover:theme-sidebar-hover transition-colors"
       >
-        <Wrench className="w-3.5 h-3.5 theme-text-muted flex-shrink-0" />
+        <Wrench className="w-3.5 h-3.5 theme-text-muted shrink-0" />
         <span className="text-xs font-mono theme-text-primary">{inv.name}</span>
         <span className="text-xs theme-text-muted flex-1 truncate">
           {inv.arguments.length > 80 ? inv.arguments.slice(0, 80) + '...' : inv.arguments}

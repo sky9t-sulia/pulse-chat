@@ -183,7 +183,7 @@ export function SettingsPage() {
   return (
     <div className={`flex-1 flex h-full overflow-hidden ${closing ? 'settings-exit' : 'settings-enter'}`}>
       {/* Sidebar tabs */}
-      <div className="w-48 flex-shrink-0 flex flex-col bg-[var(--bg-sidebar-transparent)]">
+      <div className="w-48 shrink-0 flex flex-col bg-(--bg-sidebar-transparent)">
         <div className="flex items-center gap-2 px-4 py-3 theme-border">
           <button
             onClick={handleClose}
@@ -209,7 +209,7 @@ export function SettingsPage() {
                     : 'theme-text-secondary hover-theme-text-primary'
                 }`}
               >
-                <Icon className="w-4 h-4 flex-shrink-0" />
+                <Icon className="w-4 h-4 shrink-0" />
                 {tabItem.label}
               </button>
             );
@@ -232,7 +232,7 @@ export function SettingsPage() {
             {tab === 'providers' && !providerForm.show && (
               <button
                 onClick={() => openProviderForm()}
-                className="text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1"
+                className="text-xs bg-(--accent) hover:bg-(--accent-hover) text-white px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" />
                 Add Provider
@@ -241,7 +241,7 @@ export function SettingsPage() {
             {tab === 'tools' && toolForm.mode === null && (
               <button
                 onClick={openToolAdd}
-                className="text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1"
+                className="text-xs bg-(--accent) hover:bg-(--accent-hover) text-white px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" />
                 Add Tool

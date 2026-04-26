@@ -85,7 +85,7 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
                     onClick={() => setActiveConversationId(conversation.id)}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg theme-text-primary hover-theme-sidebar-hover transition-all text-left"
                   >
-                    <MessageSquare className="w-4 h-4 flex-shrink-0 theme-text-secondary" />
+                    <MessageSquare className="w-4 h-4 shrink-0 theme-text-secondary" />
                     <span className="flex-1 text-sm truncate">{conversation.title}</span>
                   </button>
                 ))}

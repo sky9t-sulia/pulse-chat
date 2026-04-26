@@ -48,7 +48,7 @@ export function ModelList({
       </button>
 
       {expanded && (
-        <div className="max-h-80 overflow-y-auto border-t theme-border-light divide-y divide-[color:var(--bg-border-light)]">
+        <div className="max-h-80 overflow-y-auto border-t theme-border-light divide-y divide-(--bg-border-light)">
           {availableModels.map((modelKey) => {
             const modelObj = modelObjectsMap[modelKey] as Record<string, unknown> | undefined;
             const info = modelObj ? strategy?.extractModelInfo(modelObj) : null;
@@ -96,15 +96,15 @@ function ModelRow({
   onSetMaxContext: (key: string, val: number | undefined) => void;
 }) {
   return (
-    <div className={`px-3 py-2.5 transition-colors ${isDefault ? 'bg-[var(--accent)]/5' : ''}`}>
+    <div className={`px-3 py-2.5 transition-colors ${isDefault ? 'bg-(--accent)/5' : ''}`}>
       <div className="flex items-center gap-2.5">
         <button
           type="button"
           onClick={() => onToggleEnabled(modelKey)}
-          className={`w-4 h-4 rounded flex items-center justify-center border transition-colors flex-shrink-0 ${
+          className={`w-4 h-4 rounded flex items-center justify-center border transition-colors shrink-0 ${
             isEnabled
-              ? 'border-[var(--accent)] bg-[var(--accent)]'
-              : 'border-[color:var(--bg-border-light)] hover:border-[color:var(--text-muted)]'
+              ? 'border-(--accent) bg-(--accent)'
+              : 'border-(--bg-border-light) hover:border-(--text-muted)'
           }`}
           title={isEnabled ? 'Disable model' : 'Enable model'}
         >
@@ -129,7 +129,7 @@ function ModelRow({
               onSetMaxContext(modelKey, val);
             }}
             placeholder="ctx"
-            className="font-mono theme-text-primary focus:border-[color:var(--accent)] !w-20 !py-0 text-xs text-center appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className="font-mono theme-text-primary focus:border-(--accent) w-20! py-0! text-xs text-center appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             rounded="sm"
             title="Max context length (tokens)"
           />
@@ -139,13 +139,13 @@ function ModelRow({
           type="button"
           onClick={() => onSetDefault(modelKey)}
           disabled={!isEnabled}
-          className={`flex items-center justify-center flex-shrink-0 transition-opacity ${
+          className={`flex items-center justify-center shrink-0 transition-opacity ${
             isEnabled ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-30'
           }`}
           title={isDefault ? 'Default model' : 'Set as default'}
         >
           {isDefault ? (
-            <Heart className="w-4 h-4 text-[var(--accent)] fill-[var(--accent)]" />
+            <Heart className="w-4 h-4 text-(--accent) fill-(--accent)" />
           ) : (
             <Heart className="w-4 h-4 theme-text-muted" />
           )}

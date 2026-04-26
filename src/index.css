@@ -1,9 +1,8 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-serif: 'Noto Serif', Georgia, Cambria, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
 }
@@ -180,7 +179,7 @@ body {
   color: var(--inline-code);
 }
 
-/* Override SyntaxHighlighter theme backgrounds — the theme injects a <style> tag
+/* Override SyntaxHighlighter theme backgrounds — the theme injects a \3c style> tag
    with rules like code[class*="language-"] { background: ... } that we need to
    neutralize so the wrapper's CSS background shows through. */
 .chat-content code[class*='language-'],

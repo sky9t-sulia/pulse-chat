@@ -35,7 +35,7 @@ export function ProvidersTab({ providers, activeProvider, onEdit, onDelete, onSe
             <div className="flex items-center gap-2">
               <h4 className="text-sm font-medium theme-text-primary truncate">{provider.name}</h4>
               {activeProvider?.id === provider.id && (
-                <span className="text-[10px] text-[var(--active-text)] bg-[var(--accent)] bg-opacity-20 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] text-(--active-text) bg-(--accent) bg-opacity-20 px-1.5 py-0.5 rounded">
                   Active
                 </span>
               )}

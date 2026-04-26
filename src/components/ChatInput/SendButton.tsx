@@ -15,11 +15,11 @@ export function SendButton({ isStreaming, hasInput, onSend, onStop }: SendButton
       onClick={handleClick}
       disabled={!isStreaming && !hasInput}
       title={isStreaming ? 'Stop generating' : 'Send'}
-      className={`p-2 rounded-md transition-all flex-shrink-0 ${
+      className={`p-2 rounded-md transition-all shrink-0 ${
         isStreaming
-          ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
+          ? 'bg-(--accent) hover:bg-(--accent-hover) text-white'
           : hasInput
-            ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
+            ? 'bg-(--accent) hover:bg-(--accent-hover) text-white'
             : 'bg-transparent theme-text-muted cursor-not-allowed'
       }`}
     >

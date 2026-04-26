@@ -14,7 +14,7 @@ export function Dialog({ open, onClose, children, title }: DialogProps) {
         className="fixed inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-[var(--bg-main)] border theme-border-light rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto z-10">
+      <div className="relative bg-(--bg-main) border theme-border-light rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto z-10">
         {title && (
           <div className="flex items-center justify-between px-5 py-3 border-b theme-border-light">
             <h3 className="text-sm font-medium theme-text-heading">{title}</h3>

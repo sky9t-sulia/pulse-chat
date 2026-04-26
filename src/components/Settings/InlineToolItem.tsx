@@ -21,7 +21,7 @@ export function InlineToolItem({
   return (
     <>
       {isDropTarget && !isDragged && (
-        <div className="h-0.5 -my-1 mx-2 rounded bg-[var(--accent)] transition-opacity" />
+        <div className="h-0.5 -my-1 mx-2 rounded bg-(--accent) transition-opacity" />
       )}
       <div
         draggable={isCustom}
@@ -29,11 +29,11 @@ export function InlineToolItem({
         onDragEnd={() => isCustom && setDragItem(null)}
         className={`flex items-center gap-3 px-3 py-2.5 border theme-border-light rounded-lg transition-colors ${
           isDragged ? 'opacity-40' : ''
-        } ${isDropTarget && isDragged ? 'border-[var(--accent)]' : ''}
+        } ${isDropTarget && isDragged ? 'border-(--accent)' : ''}
         } ${!tool.enabled ? 'opacity-50' : ''}`}
       >
-        <GripVertical className={`w-4 h-4 flex-shrink-0 cursor-grab active:cursor-grabbing ${isCustom ? 'theme-text-muted/40' : 'hidden'}`} />
-        <Wrench className="w-4 h-4 theme-text-muted flex-shrink-0" />
+        <GripVertical className={`w-4 h-4 shrink-0 cursor-grab active:cursor-grabbing ${isCustom ? 'theme-text-muted/40' : 'hidden'}`} />
+        <Wrench className="w-4 h-4 theme-text-muted shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono theme-text-primary">{tool.name}</span>
@@ -45,7 +45,7 @@ export function InlineToolItem({
           </div>
           <p className="text-xs theme-text-muted mt-0.5">{tool.description}</p>
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           {tool.is_built_in ? (
             <>
               <button
@@ -54,7 +54,7 @@ export function InlineToolItem({
                 aria-checked={tool.enabled}
                 onClick={onToggle}
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-                  tool.enabled ? 'bg-[var(--accent)]' : 'bg-gray-600/40'
+                  tool.enabled ? 'bg-(--accent)' : 'bg-gray-600/40'
                 }`}
                 title={tool.enabled ? 'Disable' : 'Enable'}
               >
@@ -89,7 +89,7 @@ export function InlineToolItem({
                 aria-checked={tool.enabled}
                 onClick={onToggle}
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-                  tool.enabled ? 'bg-[var(--accent)]' : 'bg-gray-600/40'
+                  tool.enabled ? 'bg-(--accent)' : 'bg-gray-600/40'
                 }`}
                 title={tool.enabled ? 'Disable' : 'Enable'}
               >
