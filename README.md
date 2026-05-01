@@ -34,10 +34,10 @@ Whether you're connecting to a local Ollama instance, an OpenRouter gateway, or 
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | React 18 + TypeScript |
-| Build tool | Vite 6 |
-| Desktop wrapper | Electron 33 |
-| Styling | Tailwind CSS 3 |
+| Framework | React 19 + TypeScript |
+| Build tool | Vite 8 |
+| Desktop wrapper | Electron 41 |
+| Styling | Tailwind CSS 4 |
 | Database | sql.js (SQLite in the browser) |
 | Markdown rendering | react-markdown + rehype-katex + remark-math |
 | Syntax highlighting | react-syntax-highlighter |
@@ -75,10 +75,6 @@ This starts Vite, TypeScript watch, and Electron simultaneously. The app should 
 # Type-check only
 npm run typecheck
 
-# Build for web (static assets)
-npm run build:web
-
-# Build desktop app
 npm run build          # General build
 npm run build:macos    # macOS DMG
 npm run build:linux    # Linux AppImage
