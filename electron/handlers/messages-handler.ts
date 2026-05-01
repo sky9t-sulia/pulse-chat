@@ -5,11 +5,12 @@ import { query, run, saveDb } from '../database';
 export function registerMessagesHandlers(): void {
   ipcMain.handle('messages:get', (_e, conversationId: string) => {
     const rows = query<any>(
-      `SELECT id, role, content, reasoning, created_at, model, input_tokens, output_tokens, reasoning_tokens, duration_ms, tool_invocations FROM messages WHERE conversation_id = ? ORDER BY created_at ASC`,
+      `SELECT id, role, content, is_error, reasoning, created_at, model, input_tokens, output_tokens, reasoning_tokens, duration_ms, tool_invocations FROM messages WHERE conversation_id = ? ORDER BY created_at ASC`,
       [conversationId]
     );
     return rows.map((row) => ({
       ...row,
+      is_error: !!row.is_error,
       tool_invocations: row.tool_invocations ? JSON.parse(row.tool_invocations) : null,
     }));
   });
@@ -27,19 +28,21 @@ export function registerMessagesHandlers(): void {
       outputTokens?: number,
       reasoningTokens?: number,
       durationMs?: number,
-      toolInvocations?: unknown[] | null
+      toolInvocations?: unknown[] | null,
+      isError?: boolean
     ) => {
       const id = uuidv4();
       const now = Date.now();
       const toolInvocationsJson =
         toolInvocations && toolInvocations.length > 0 ? JSON.stringify(toolInvocations) : null;
       run(
-        'INSERT INTO messages (id, conversation_id, role, content, reasoning, created_at, model, input_tokens, output_tokens, reasoning_tokens, duration_ms, tool_invocations) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO messages (id, conversation_id, role, content, is_error, reasoning, created_at, model, input_tokens, output_tokens, reasoning_tokens, duration_ms, tool_invocations) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           id,
           conversationId,
           role,
           content,
+          isError ? 1 : 0,
           reasoning || null,
           now,
           model || null,
@@ -56,6 +59,7 @@ export function registerMessagesHandlers(): void {
         id,
         role,
         content,
+        is_error: !!isError,
         reasoning,
         created_at: now,
         model,

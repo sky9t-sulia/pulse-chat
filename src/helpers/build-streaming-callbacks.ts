@@ -7,6 +7,7 @@ export function buildStreamingCallbacks(streamingState: {
   setLoadingPhase: (phase: LoadingPhase) => void;
   setTokenStats: (stats: TokenStats | null) => void;
   setToolInvocations: (invocations: ToolInvocation[]) => void;
+  setError?: (message: string) => void;
 }): StreamingCallbacks {
   const { setStreamingContent, setStreamingReasoningContent, setIsStreaming, setLoadingPhase, setTokenStats } = streamingState;
 
@@ -18,7 +19,7 @@ export function buildStreamingCallbacks(streamingState: {
     onError: (errorMessage) => {
       setStreamingContent(errorMessage);
       setIsStreaming(false);
-      setLoadingPhase({ kind: 'idle' });
+      setLoadingPhase({ kind: 'error', message: errorMessage });
     },
   };
 }

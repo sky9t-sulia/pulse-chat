@@ -15,7 +15,8 @@ export function useMessages(
       outputTokens?: number,
       reasoningTokens?: number,
       durationMs?: number,
-      toolInvocations?: ToolInvocationRecord[] | null
+      toolInvocations?: ToolInvocationRecord[] | null,
+      isError?: boolean
     ) => {
       const msg = await window.chatApi.messages.add(
         conversationId,
@@ -27,7 +28,8 @@ export function useMessages(
         outputTokens,
         reasoningTokens,
         durationMs,
-        toolInvocations
+        toolInvocations,
+        isError
       );
       setMessages((prev) => [...prev, msg as Message]);
       return msg as Message;

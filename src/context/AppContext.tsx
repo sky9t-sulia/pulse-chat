@@ -43,7 +43,8 @@ interface AppContextType {
     outputTokens?: number,
     reasoningTokens?: number,
     durationMs?: number,
-    toolInvocations?: ToolInvocationRecord[] | null
+    toolInvocations?: ToolInvocationRecord[] | null,
+    isError?: boolean
   ) => Promise<Message>;
   deleteMessages: (conversationId: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;

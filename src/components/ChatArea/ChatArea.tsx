@@ -29,7 +29,7 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
     activeProvider,
     userSettings,
   } = useApp();
-  const showLoading = isStreaming && !streamingContent;
+  const showLoading = isStreaming && !streamingContent && loadingPhase.kind !== 'error';
 
   function getGreeting() {
     const hour = new Date().getHours();
@@ -160,7 +160,7 @@ export default function ChatArea({ streamingContent, streamingReasoningContent, 
             </div>
           )}
 
-          {streamingContent && (
+          {streamingContent && loadingPhase.kind !== 'error' && (
             <div className="flex justify-start mb-4">
               <div className="chat-content max-w-[85%] w-full">
                 {streamingReasoningContent && (

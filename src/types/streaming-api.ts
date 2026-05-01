@@ -1,7 +1,8 @@
 export type LoadingPhase =
   | { kind: 'idle' }
   | { kind: 'waiting' }
-  | { kind: 'streaming' };
+  | { kind: 'streaming' }
+  | { kind: 'error'; message: string };
 
 export interface TokenStats {
   input_tokens: number;

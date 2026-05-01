@@ -27,6 +27,7 @@ export async function streamResponse(
   cancelRef: React.MutableRefObject<(() => void) | null>,
   callbacks: StreamingCallbacks,
   userContext?: UserContext,
+  onError?: (message: string) => void,
 ): Promise<StreamResult> {
   const streamBody = buildRequestBody(
     model,
@@ -70,15 +71,28 @@ export async function streamResponse(
 
     if (!response.ok) {
       const errorText = await response.text();
-      callbacks.onError(`[Error ${response.status}: ${errorText}]`);
+      let userMessage: string;
+      if (response.status === 401) {
+        userMessage = 'Authentication failed. Check your API key in settings.';
+      } else if (response.status === 404) {
+        userMessage = `Model not found. Check that the model is available at your provider's URL.`;
+      } else if (response.status >= 500) {
+        userMessage = `Server error (${response.status}). The provider's server may be temporarily unavailable.`;
+      } else {
+        userMessage = `Request failed (${response.status}): ${errorText.slice(0, 200)}`;
+      }
+      callbacks.onError(userMessage);
       callbacks.onPhase({ kind: 'idle' });
+      onError?.(userMessage);
       return EMPTY_RESULT;
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
-      callbacks.onError('[Error: No stream available]');
+      const userMessage = 'No stream available from the server.';
+      callbacks.onError(userMessage);
       callbacks.onPhase({ kind: 'idle' });
+      onError?.(userMessage);
       return EMPTY_RESULT;
     }
 
@@ -113,20 +127,29 @@ export async function streamResponse(
               continue;
             }
 
-            try {
-              const json = JSON.parse(data) as JsonChunk;
-              const eventType = currentEventType || json.type;
+            const json = JSON.parse(data) as JsonChunk;
+            const eventType = currentEventType || json.type;
 
-              Object.assign(state, handleJsonChunk({ ...json, type: eventType }, state));
-              accumulatedContent = state.accumulatedContent;
-              accumulatedReasoning = state.accumulatedReasoning;
-              finalStats = state.finalStats;
-              Object.assign(toolCallsByIndex, state.toolCallsByIndex);
-            } catch {
-              // skip malformed JSON
+            // Handle SSE error events — throw out of the streaming loop
+            if (eventType === 'error') {
+              const errorObj = json as unknown as Record<string, unknown>;
+              const errorMsg = errorObj.error
+                ? typeof errorObj.error === 'string'
+                  ? errorObj.error
+                  : ((errorObj.error as Record<string, unknown>)?.message
+                    ? String((errorObj.error as Record<string, unknown>)?.message)
+                    : JSON.stringify(errorObj.error))
+                : errorObj.message
+                  ? String(errorObj.message)
+                  : 'Stream error occurred.';
+              throw new Error(errorMsg as string);
             }
 
-            currentEventType = '';
+            Object.assign(state, handleJsonChunk({ ...json, type: eventType }, state));
+            accumulatedContent = state.accumulatedContent;
+            accumulatedReasoning = state.accumulatedReasoning;
+            finalStats = state.finalStats;
+            Object.assign(toolCallsByIndex, state.toolCallsByIndex);
           }
         }
       }
@@ -140,8 +163,20 @@ export async function streamResponse(
     );
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    callbacks.onError(`[Error: ${msg}]`);
+    let userMessage: string;
+    // SSE error events already have user-friendly messages
+    if (msg.includes('Model unloaded') || msg.includes('Stream error')) {
+      userMessage = msg;
+    } else if (msg.includes('fetch') || msg.includes('NetworkError') || msg.includes('Failed to fetch')) {
+      userMessage = 'Failed to connect. Check your internet connection and provider settings.';
+    } else if (msg.includes('abort') || msg.includes('canceled')) {
+      userMessage = 'Request was cancelled.';
+    } else {
+      userMessage = `Connection error: ${msg}`;
+    }
+    callbacks.onError(userMessage);
     callbacks.onPhase({ kind: 'idle' });
+    onError?.(userMessage);
     return EMPTY_RESULT;
   }
 

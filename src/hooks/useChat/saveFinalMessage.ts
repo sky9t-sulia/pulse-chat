@@ -22,7 +22,8 @@ export interface FinalMessageData {
     outputTokens?: number,
     reasoningTokens?: number,
     durationMs?: number,
-    toolInvocations?: ToolInvocation[] | null
+    toolInvocations?: ToolInvocation[] | null,
+    isError?: boolean
   ) => Promise<Message>;
   updateConversationTitle: (convId: string, title: string) => Promise<void>;
   setStreamingContent: (content: string) => void;
@@ -41,7 +42,7 @@ export async function saveFinalMessage(data: FinalMessageData): Promise<void> {
     setIsStreaming, setLoadingPhase, requestStartedAt,
   } = data;
 
-  const isFirstAssistant = !messagesRef.current.some((message) => message.role === 'assistant');
+  const isFirstAssistant = !messagesRef.current.some((message) => message.role === 'assistant' && !message.is_error);
   const firstUserMsg = messagesRef.current.find((message) => message.role === 'user')?.content ?? '';
 
   let durationMs: number;

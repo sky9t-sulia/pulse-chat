@@ -98,6 +98,7 @@ const chatApi = {
       reasoningTokens?: number,
       durationMs?: number,
       toolInvocations?: ToolInvocationRecord[] | null,
+      isError?: boolean
     ) =>
       ipcRenderer.invoke(
         'messages:add',
@@ -111,6 +112,7 @@ const chatApi = {
         reasoningTokens,
         durationMs,
         toolInvocations,
+        isError,
       ) as Promise<Message>,
     delete: (conversationId: string) =>
       ipcRenderer.invoke('messages:delete', conversationId),

@@ -32,7 +32,8 @@ export interface SendMessageArgs {
     outputTokens?: number,
     reasoningTokens?: number,
     durationMs?: number,
-    toolInvocations?: ToolInvocation[] | null
+    toolInvocations?: ToolInvocation[] | null,
+    isError?: boolean
   ) => Promise<Message>;
   chatSettings: { system_prompt: string; max_calls_per_tool?: number };
   userContext?: UserContext;
@@ -59,7 +60,9 @@ export async function sendMessage(args: SendMessageArgs) {
 
   await addMessage(convId, 'user', content, usedModel);
   const chatMessages: ApiMessage[] = [
-    ...messagesRef.current.map((message) => ({ role: message.role, content: message.content })),
+    ...messagesRef.current
+      .filter((message) => !message.is_error)
+      .map((message) => ({ role: message.role, content: message.content })),
     { role: 'user', content },
   ];
   const chatUrl = getFullChatUrl(provider);
@@ -78,6 +81,8 @@ export async function sendMessage(args: SendMessageArgs) {
   let finalStats: TokenStats | null = null;
   let firstContentAt: number | null = null;
   const requestStartedAt = Date.now();
+  let streamFailed = false;
+  let errorMessage = '';
 
   const { streamResponse } = await import('./streaming');
   const callbacks = buildStreamingCallbacks(streamingState);
@@ -98,6 +103,7 @@ export async function sendMessage(args: SendMessageArgs) {
       cancelRef,
       callbacks,
       userContext,
+      (msg) => { streamFailed = true; errorMessage = msg; },
     );
   };
 
@@ -107,6 +113,9 @@ export async function sendMessage(args: SendMessageArgs) {
   let maxLoops = 10;
 
   while (maxLoops > 0) {
+    // If the stream failed, break immediately — don't overwrite accumulatedContent
+    if (streamFailed) break;
+
     accumulatedContent = loopResult.content;
     if (loopResult.reasoning) {
       accumulatedReasoningContent = accumulatedReasoningContent
@@ -147,6 +156,23 @@ export async function sendMessage(args: SendMessageArgs) {
   }
 
   // Final: save the message and finish
+  if (streamFailed) {
+    // Stream failed — if we have partial content, save it with the error appended
+    const errorContent = accumulatedContent
+      ? `${accumulatedContent}\n\nResponse interrupted: ${errorMessage}`
+      : errorMessage;
+
+    if (errorContent) {
+      await addMessage(convId, 'assistant', errorContent, usedModel, undefined, undefined, undefined, undefined, undefined, undefined, true);
+    }
+    streamingState.setStreamingContent('');
+    streamingState.setStreamingReasoningContent('');
+    streamingState.setToolInvocations([]);
+    streamingState.setIsStreaming(false);
+    streamingState.setLoadingPhase({ kind: 'idle' });
+    return;
+  }
+
   if (accumulatedContent) {
     await saveFinalMessage({
       content: accumulatedContent,

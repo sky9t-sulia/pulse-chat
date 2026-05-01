@@ -1,9 +1,30 @@
 import { memo, useState } from 'react';
-import { ChevronDown, ChevronUp, RefreshCw, Trash2, RotateCcw, Wrench, Loader2, Check, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, RefreshCw, Trash2, RotateCcw, Wrench, Loader2, Check, AlertCircle, AlertTriangle } from 'lucide-react';
 import type { Message } from '../../types/types';
 import type { ToolInvocation } from '../../hooks/useChat';
 import { MessageContent } from './MessageContent';
 import { ReasoningBlock } from './ReasoningBlock';
+
+// Detect if a message is an error message
+function isErrorMessage(message: Message): boolean {
+  return !!message.is_error;
+}
+
+function ErrorBubble({ message }: { message: Message }) {
+  return (
+    <div className="max-w-full min-w-0">
+      <div className="border border-red-400/30 bg-error rounded-lg overflow-hidden font-sans text-xs">
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-red-400/20 bg-error-header">
+          <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+          <span className="text-xs font-medium text-red-300">Response Error</span>
+        </div>
+        <div className="px-3 py-2.5 text-xs font-sans-forced">
+          <MessageContent content={message.content} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function ToolInvocationRow({ inv }: { inv: ToolInvocation }) {
   const [expanded, setExpanded] = useState(false);
@@ -87,6 +108,7 @@ export const MessageBubble = memo(function MessageBubble({
   onDelete?: (id: string) => void;
 }) {
   const isUser = message.role === 'user';
+  const isError = !isUser && isErrorMessage(message);
 
   return (
     <div className={`group flex flex-col w-full min-w-0 ${isUser ? 'items-end' : 'items-start'} mb-6`}>
@@ -94,11 +116,15 @@ export const MessageBubble = memo(function MessageBubble({
         className={`chat-content max-w-full min-w-0 ${
           isUser
             ? 'theme-input px-4 py-2.5 rounded-2xl rounded-br-md'
-            : 'w-full'
+            : isError
+              ? 'max-w-[85%] w-full'
+              : 'w-full'
         }`}
       >
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
+        ) : isError ? (
+          <ErrorBubble message={message} />
         ) : (
           <>
             {message.tool_invocations && message.tool_invocations.length > 0 && (

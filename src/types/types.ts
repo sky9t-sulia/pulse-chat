@@ -20,6 +20,7 @@ export interface Message {
   conversation_id: string;
   role: 'user' | 'assistant';
   content: string;
+  is_error?: boolean;
   reasoning?: string;
   created_at: number;
   model?: string;
@@ -135,7 +136,8 @@ export interface ChatAPI {
       outputTokens?: number,
       reasoningTokens?: number,
       durationMs?: number,
-      toolInvocations?: ToolInvocationRecord[] | null
+      toolInvocations?: ToolInvocationRecord[] | null,
+      isError?: boolean
     ) => Promise<Message>;
     delete: (conversationId: string) => Promise<void>;
     deleteOne: (id: string) => Promise<void>;

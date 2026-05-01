@@ -35,6 +35,7 @@ export async function initDatabase(): Promise<void> {
       conversation_id TEXT NOT NULL,
       role TEXT NOT NULL,
       content TEXT NOT NULL,
+      is_error INTEGER NOT NULL DEFAULT 0,
       reasoning TEXT,
       created_at INTEGER NOT NULL,
       model TEXT,
@@ -85,6 +86,13 @@ export async function initDatabase(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
   `);
+
+  // Migration: add is_error column to messages table if it doesn't exist yet
+  try {
+    _db!.run(`ALTER TABLE messages ADD COLUMN is_error INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    // Column already exists (table was created with it, or migration already ran)
+  }
 
   // Register before-quit save
   app.on('before-quit', () => {

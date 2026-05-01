@@ -84,7 +84,8 @@ interface ChatAPI {
       outputTokens?: number,
       reasoningTokens?: number,
       durationMs?: number,
-      toolInvocations?: ToolInvocationRecord[] | null
+      toolInvocations?: ToolInvocationRecord[] | null,
+      isError?: boolean
     ) => Promise<Message>;
     delete: (conversationId: string) => Promise<void>;
     deleteOne: (id: string) => Promise<void>;

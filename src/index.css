@@ -373,6 +373,15 @@ body {
 .theme-text-heading { color: var(--text-heading); }
 .theme-text-muted { color: var(--text-muted); }
 
+/* Error message backgrounds */
+:root .bg-error { background-color: rgba(239, 68, 68, 0.06); }
+:root .bg-error-header { background-color: rgba(239, 68, 68, 0.06); }
+
+/* Force sans (Inter) font for user and error messages, regardless of user font setting */
+.font-sans-forced {
+  --chat-font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
 /* Hover variants for theme classes */
 :root .hover-theme-text-primary:hover { color: var(--text-primary); }
 :root .hover-theme-text-secondary:hover { color: var(--text-secondary); }
